@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const N=14,c=document.getElementById('game'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);
-let w=0,h=0,zoom=1,panX=0,panY=0,selected=null,active=null,hit=[],drag=null,seed=0,state;
+let w=0,h=0,zoom=1,panX=0,panY=0,selected=null,active=null,hit=[],drag=null,seed=0,state,combat=null,combatBusy=false;
 const rand=(x,z,s)=>{const n=Math.sin((x+17)*127.1+(z+29)*311.7+s*74.7)*43758.5453;return n-Math.floor(n)};
 const idx=(x,z)=>z*N+x,inside=(x,z)=>x>=0&&z>=0&&x<N&&z<N;
 const dist=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.z-b.z);
@@ -30,6 +30,27 @@ function reachable(u){
  }
  return result;
 }
+function attackTargets(u){return state.units.filter(v=>v.owner!==u.owner&&dist(u,v)===1)}
+function resolveCombat(attacker,defender){
+ combatBusy=true;
+ const damage=5,retaliation=defender.hp>damage&&dist(attacker,defender)===1?3:0;
+ combat={from:{x:attacker.x,z:attacker.z},to:{x:defender.x,z:defender.z},started:performance.now(),damage,retaliation};
+ attacker.moved=true;attacker.attacked=true;
+ // Resolve damage at the end of the short attack animation.
+ setTimeout(()=>{
+  defender.hp=Math.max(0,defender.hp-damage);
+  if(defender.hp===0)state.units=state.units.filter(v=>v!==defender);
+  if(retaliation)attacker.hp=Math.max(0,attacker.hp-retaliation);
+  if(attacker.hp===0)state.units=state.units.filter(v=>v!==attacker);
+  const defeated=defender.hp===0;
+  combat=null;combatBusy=false;active=null;
+  selected=state.units.includes(attacker)?{x:attacker.x,z:attacker.z}:null;
+  message(defeated?'⚔️ Vijand verslagen!':('⚔️ '+damage+' schade! Tegenaanval: '+retaliation+' schade.'));
+  checkWin();save();draw();
+ },380);
+ requestAnimationFrame(animateCombat);
+}
+function animateCombat(){if(!combat)return;draw();requestAnimationFrame(animateCombat)}
 const income=owner=>state.cities.filter(v=>v.owner===owner).reduce((a,v)=>a+2+v.lv,0);
 function message(t){$('message').textContent=t}
 function save(){localStorage.setItem('kingdoms-of-vale-01',JSON.stringify({seed,state}))}
@@ -41,15 +62,19 @@ function tree(x,y){polygon([[x,y-34],[x-12,y-8],[x+12,y-8]],'#1f6c37');polygon([
 function hill(x,y){polygon([[x-22,y-8],[x,y-40],[x+22,y-8]],'#82918b');polygon([[x,y-40],[x+22,y-8],[x+2,y-8]],'#4b656f');polygon([[x-7,y-28],[x,y-40],[x+9,y-26]],'#e5f5ec')}
 function soldier(x,y,u){const blue=u.owner===0;polygon([[x-7,y-10],[x,y-15],[x+7,y-10],[x+7,y-1],[x,y+4],[x-7,y-1]],blue?'#2b93d8':'#cb5c68');ctx.fillStyle='#f8dbab';ctx.beginPath();ctx.arc(x,y-19,6,0,7);ctx.fill();ctx.fillStyle=blue?'#224b7e':'#742f46';ctx.fillRect(x-7,y-27,14,5);ctx.fillStyle='#1d2431';ctx.fillRect(x+8,y-13,2,23);ctx.fillStyle='#faeea9';ctx.fillRect(x+7,y-15,4,7);ctx.fillStyle='#26333c';ctx.fillRect(x-6,y+4,4,4);ctx.fillRect(x+3,y+4,4,4);ctx.fillStyle='#0009';ctx.fillRect(x-12,y+12,24,4);ctx.fillStyle=blue?'#65d4ff':'#ff9a99';ctx.fillRect(x-12,y+12,Math.max(0,u.hp/10)*24,4)}
 function coord(x,z){const unit=27*zoom;return [w/2+panX+(x-z)*unit,h*.30+panY+(x+z)*unit*.52]}
-function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();
+function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();const targets=active&&!active.moved?new Set(attackTargets(active).map(v=>idx(v.x,v.z))):new Set();
 for(let layer=0;layer<N*2;layer++)for(let z=0;z<N;z++){let x=layer-z;if(!inside(x,z))continue;const t=tile(x,z),[px,py]=coord(x,z),a=27*zoom,b=a*.52,highlight=selected&&selected.x===x&&selected.z===z;
 let colors={water:'#4da9bf',grass:'#83c868',forest:'#61ad5b',mountain:'#a1a69a',sand:'#eac879'},side={water:'#267b94',grass:'#528f4c',forest:'#438446',mountain:'#666f70',sand:'#cb9e53'};
 const p=[[px,py],[px+a,py+b],[px,py+2*b],[px-a,py+b]];hit.push({x,z,points:p,depth:layer});
-polygon([[px-a,py+b],[px,py+2*b],[px,py+2*b+8*zoom],[px-a,py+b+8*zoom]],side[t.t]);polygon([[px,py+2*b],[px+a,py+b],[px+a,py+b+8*zoom],[px,py+2*b+8*zoom]],side[t.t]);polygon(p,highlight?'#f7e5a0':moves.has(idx(x,z))?'#7cead4':colors[t.t],'#19393025');
+polygon([[px-a,py+b],[px,py+2*b],[px,py+2*b+8*zoom],[px-a,py+b+8*zoom]],side[t.t]);polygon([[px,py+2*b],[px+a,py+b],[px+a,py+b+8*zoom],[px,py+2*b+8*zoom]],side[t.t]);polygon(p,highlight?'#f7e5a0':targets.has(idx(x,z))?'#f08a82':moves.has(idx(x,z))?'#7cead4':colors[t.t],'#19393025');
 const cy=py+b;if(t.t==='forest')tree(px,cy);if(t.t==='mountain')hill(px,cy+5);if(t.t==='sand'&&t.r){ctx.fillStyle='#91a847';ctx.fillRect(px,cy-10,3,12)}if(t.t==='grass'&&t.r){ctx.fillStyle='#ead488';ctx.beginPath();ctx.arc(px,cy-6,4,0,7);ctx.fill()}
 const ct=city(x,z);if(ct)tower(px,cy-7,ct.owner,ct.lv);
 const u=unit(x,z);if(u)soldier(px+9,cy+3,u);
-if(moves.has(idx(x,z))){ctx.strokeStyle='#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
+if(moves.has(idx(x,z))||targets.has(idx(x,z))){ctx.strokeStyle=targets.has(idx(x,z))?'#ff4444':'#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
+if(combat&&((combat.from.x===x&&combat.from.z===z)||(combat.to.x===x&&combat.to.z===z))){
+ const progress=Math.min(1,(performance.now()-combat.started)/380),pulse=Math.sin(progress*Math.PI);
+ ctx.strokeStyle='#ffe574';ctx.lineWidth=4*pulse;ctx.beginPath();ctx.arc(px,cy-16,8+18*pulse,0,Math.PI*2);ctx.stroke();
+}
 }
 $('stars').textContent=state.stars[0];$('turn').textContent=state.turn;$('cities').textContent=state.cities.filter(v=>v.owner===0).length;$('units').textContent=state.units.filter(v=>v.owner===0).length;const ct=selected&&city(selected.x,selected.z),u=selected&&unit(selected.x,selected.z),t=selected&&tile(selected.x,selected.z);
 $('selection').textContent=ct?ct.name+' · niveau '+ct.lv:u?(u.owner===0?'Jouw krijger':'Vijandelijke krijger'):'Selecteer een tegel';
@@ -59,15 +84,11 @@ $('recruit').disabled=!ct||ct.owner!==0||state.stars[0]<3||state.win!==null;$('u
 function pointIn(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes}return yes}
 function pick(px,py){for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
 function tap(x,z){
- if(state.win!==null)return;
+ if(state.win!==null||combatBusy)return;
  const u=unit(x,z);
  if(active&&!active.moved){
   const opponent=u&&u.owner===1&&dist(active,{x,z})===1?u:null;
-  if(opponent){
-   opponent.hp-=5;active.moved=true;message('Aanval! 5 schade.');
-   if(opponent.hp<=0)state.units=state.units.filter(v=>v!==opponent);
-   active=null;save();draw();return;
-  }
+  if(opponent){resolveCombat(active,opponent);return;}
   if(reachable(active).has(idx(x,z))){
    active.x=x;active.z=z;active.moved=true;
    const ct=city(x,z);
@@ -77,7 +98,7 @@ function tap(x,z){
   }
  }
  selected={x,z};active=u&&u.owner===0&&!u.moved?u:null;
- if(active)message('Groene vakjes: hier kun je naartoe lopen. Tik op je bestemming.');
+ if(active)message('Groen = lopen · Rood = aanvallen. Tik op een vijand om te vechten.');
  draw();
 }
 function checkWin(){if(!state.cities.some(v=>v.owner===1)){state.win=0;message('🏆 Overwinning! Alle vijandelijke steden veroverd.')}}
@@ -85,9 +106,9 @@ function enemyTurn(){for(const enemy of [...state.units].filter(v=>v.owner===1))
 state.units=state.units.filter(u=>u.hp>0);
 if(state.stars[1]>=3&&state.units.filter(u=>u.owner===1).length<5){let ct=state.cities.find(v=>v.owner===1),spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];let p=ct&&spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(ct&&p){state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:1,hp:10,moved:true});state.stars[1]-=3}}
 if(!state.cities.some(v=>v.owner===0)){state.win=1;message('Je rijk is gevallen. Probeer opnieuw.')}} 
-$('end').onclick=()=>{if(state.win!==null)return;const gained=income(0);state.stars[0]+=gained;state.stars[1]+=income(1);state.turn++;state.units.forEach(u=>u.moved=false);enemyTurn();selected=null;active=null;if(state.win===null)message('Beurt '+state.turn+' · +'+gained+' sterren');save();draw()};
-$('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(!ct||ct.owner!==0||state.stars[0]<3)return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,hp:10,moved:true});state.stars[0]-=3;message('Nieuwe krijger gerekruteerd');save();draw()};
-$('upgrade').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2)return;state.stars[0]-=4+ct.lv*2;ct.lv++;message(ct.name+' geüpgraded!');save();draw()};
+$('end').onclick=()=>{if(state.win!==null||combatBusy)return;const gained=income(0);state.stars[0]+=gained;state.stars[1]+=income(1);state.turn++;state.units.forEach(u=>{u.moved=false;u.attacked=false});enemyTurn();selected=null;active=null;if(state.win===null)message('Beurt '+state.turn+' · +'+gained+' sterren');save();draw()};
+$('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(combatBusy||!ct||ct.owner!==0||state.stars[0]<3)return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,hp:10,moved:true});state.stars[0]-=3;message('Nieuwe krijger gerekruteerd');save();draw()};
+$('upgrade').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(combatBusy||!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2)return;state.stars[0]-=4+ct.lv*2;ct.lv++;message(ct.name+' geüpgraded!');save();draw()};
 $('reset').onclick=()=>{if(confirm('Een nieuw spel starten?'))init()};
 function resize(){const d=Math.min(devicePixelRatio||1,2);w=c.clientWidth;h=c.clientHeight;c.width=w*d;c.height=h*d;ctx.setTransform(d,0,0,d,0,0);draw()}addEventListener('resize',resize);
 c.addEventListener('pointerdown',e=>{c.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,px:panX,py:panY,moved:false}});
