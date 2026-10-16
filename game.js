@@ -1,6 +1,8 @@
 (()=>{'use strict';
 const N=14,c=document.getElementById('game'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);
 let w=0,h=0,zoom=1,panX=0,panY=0,selected=null,active=null,hit=[],drag=null,seed=0,state,combat=null,combatBusy=false;
+const TYPES={warrior:{name:'Krijger',cost:3,hp:10,damage:5,move:2,range:1},archer:{name:'Boogschutter',cost:5,hp:7,damage:4,move:2,range:2},knight:{name:'Ridder',cost:7,hp:14,damage:6,move:3,range:1}};
+const typeOf=u=>TYPES[u.type]||TYPES.warrior;
 const rand=(x,z,s)=>{const n=Math.sin((x+17)*127.1+(z+29)*311.7+s*74.7)*43758.5453;return n-Math.floor(n)};
 const idx=(x,z)=>z*N+x,inside=(x,z)=>x>=0&&z>=0&&x<N&&z<N;
 const dist=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.z-b.z);
@@ -17,11 +19,11 @@ selected=null;active=null;panX=0;panY=0;zoom=1;message('Welkom in Kingdoms of Va
 function walk(ts,x,z){return inside(x,z)&&!['water','mountain'].includes(ts[idx(x,z)].t)}
 const tile=(x,z)=>inside(x,z)?state.tiles[idx(x,z)]:null,city=(x,z)=>state.cities.find(v=>v.x===x&&v.z===z),unit=(x,z)=>state.units.find(v=>v.x===x&&v.z===z);
 // Breadth-first search: only reachable tiles are shown. Units cannot cross blockers.
-const MOVE_RANGE=2;
+// Unit movement allowances are defined in TYPES.
 function reachable(u){
  const visited=new Set([idx(u.x,u.z)]),queue=[{x:u.x,z:u.z,steps:0}],result=new Set();
  for(let i=0;i<queue.length;i++){
-  const p=queue[i];if(p.steps>=MOVE_RANGE)continue;
+  const p=queue[i];if(p.steps>=typeOf(u).move)continue;
   for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
    const x=p.x+dx,z=p.z+dz,k=idx(x,z);
    if(!walk(state.tiles,x,z)||visited.has(k)||unit(x,z))continue;
@@ -30,10 +32,10 @@ function reachable(u){
  }
  return result;
 }
-function attackTargets(u){return state.units.filter(v=>v.owner!==u.owner&&dist(u,v)===1)}
+function attackTargets(u){return state.units.filter(v=>v.owner!==u.owner&&dist(u,v)<=typeOf(u).range)}
 function resolveCombat(attacker,defender){
  combatBusy=true;
- const damage=5,retaliation=defender.hp>damage&&dist(attacker,defender)===1?3:0;
+ const damage=typeOf(attacker).damage,retaliation=defender.hp>damage&&dist(attacker,defender)<=typeOf(defender).range?Math.max(1,typeOf(defender).damage-2):0;
  combat={from:{x:attacker.x,z:attacker.z},to:{x:defender.x,z:defender.z},started:performance.now(),damage,retaliation};
  attacker.moved=true;attacker.attacked=true;
  // Resolve damage at the end of the short attack animation.
@@ -60,7 +62,10 @@ function tower(x,y,owner,lv){let top=y-15-lv*3,color=owner===0?'#30bce2':owner==
 function cityLabel(owner){return owner===0?'◆':owner===1?'◇':'•'}
 function tree(x,y){polygon([[x,y-34],[x-12,y-8],[x+12,y-8]],'#1f6c37');polygon([[x,y-42],[x-10,y-22],[x+10,y-22]],'#359c4a');ctx.fillStyle='#74583d';ctx.fillRect(x-2,y-9,4,9)}
 function hill(x,y){polygon([[x-22,y-8],[x,y-40],[x+22,y-8]],'#82918b');polygon([[x,y-40],[x+22,y-8],[x+2,y-8]],'#4b656f');polygon([[x-7,y-28],[x,y-40],[x+9,y-26]],'#e5f5ec')}
-function soldier(x,y,u){const blue=u.owner===0;polygon([[x-7,y-10],[x,y-15],[x+7,y-10],[x+7,y-1],[x,y+4],[x-7,y-1]],blue?'#2b93d8':'#cb5c68');ctx.fillStyle='#f8dbab';ctx.beginPath();ctx.arc(x,y-19,6,0,7);ctx.fill();ctx.fillStyle=blue?'#224b7e':'#742f46';ctx.fillRect(x-7,y-27,14,5);ctx.fillStyle='#1d2431';ctx.fillRect(x+8,y-13,2,23);ctx.fillStyle='#faeea9';ctx.fillRect(x+7,y-15,4,7);ctx.fillStyle='#26333c';ctx.fillRect(x-6,y+4,4,4);ctx.fillRect(x+3,y+4,4,4);ctx.fillStyle='#0009';ctx.fillRect(x-12,y+12,24,4);ctx.fillStyle=blue?'#65d4ff':'#ff9a99';ctx.fillRect(x-12,y+12,Math.max(0,u.hp/10)*24,4)}
+function soldier(x,y,u){const blue=u.owner===0;polygon([[x-7,y-10],[x,y-15],[x+7,y-10],[x+7,y-1],[x,y+4],[x-7,y-1]],blue?'#2b93d8':'#cb5c68');ctx.fillStyle='#f8dbab';ctx.beginPath();ctx.arc(x,y-19,6,0,7);ctx.fill();ctx.fillStyle=blue?'#224b7e':'#742f46';ctx.fillRect(x-7,y-27,14,5);ctx.fillStyle='#1d2431';
+if(u.type==='archer'){ctx.strokeStyle='#ffe09a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+10,y-12,8,-1.3,1.3);ctx.stroke();ctx.fillRect(x+8,y-21,2,19)}
+else if(u.type==='knight'){ctx.fillStyle='#c8cbd5';ctx.fillRect(x-8,y-13,17,17);ctx.fillStyle='#f5d06c';ctx.fillRect(x+8,y-17,3,26)}
+else{ctx.fillRect(x+8,y-13,2,23);ctx.fillStyle='#faeea9';ctx.fillRect(x+7,y-15,4,7)}ctx.fillStyle='#26333c';ctx.fillRect(x-6,y+4,4,4);ctx.fillRect(x+3,y+4,4,4);ctx.fillStyle='#0009';ctx.fillRect(x-12,y+12,24,4);ctx.fillStyle=blue?'#65d4ff':'#ff9a99';ctx.fillRect(x-12,y+12,Math.max(0,u.hp/typeOf(u).hp)*24,4)}
 function coord(x,z){const unit=27*zoom;return [w/2+panX+(x-z)*unit,h*.30+panY+(x+z)*unit*.52]}
 function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();const targets=active&&!active.moved?new Set(attackTargets(active).map(v=>idx(v.x,v.z))):new Set();
 for(let layer=0;layer<N*2;layer++)for(let z=0;z<N;z++){let x=layer-z;if(!inside(x,z))continue;const t=tile(x,z),[px,py]=coord(x,z),a=27*zoom,b=a*.52,highlight=selected&&selected.x===x&&selected.z===z;
@@ -77,9 +82,9 @@ if(combat&&((combat.from.x===x&&combat.from.z===z)||(combat.to.x===x&&combat.to.
 }
 }
 $('stars').textContent=state.stars[0];$('turn').textContent=state.turn;$('cities').textContent=state.cities.filter(v=>v.owner===0).length;$('units').textContent=state.units.filter(v=>v.owner===0).length;const ct=selected&&city(selected.x,selected.z),u=selected&&unit(selected.x,selected.z),t=selected&&tile(selected.x,selected.z);
-$('selection').textContent=ct?ct.name+' · niveau '+ct.lv:u?(u.owner===0?'Jouw krijger':'Vijandelijke krijger'):'Selecteer een tegel';
-$('details').textContent=u?'❤️ '+u.hp+'/10 · '+(u.moved?'Al verplaatst':'Klaar voor actie'):ct?ct.owner===0?'Jouw stad · +'+(ct.lv+2)+' sterren per beurt':ct.owner===1?'Vijandelijke stad':'Neutraal dorp':t?'Terrein: '+t.t:'Tik op een tegel om te starten';
-$('recruit').disabled=!ct||ct.owner!==0||state.stars[0]<3||state.win!==null;$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?4+ct.lv*2:6)+'⭐)';
+$('selection').textContent=ct?ct.name+' · niveau '+ct.lv:u?(u.owner===0?'Jouw ':'Vijandelijke ')+typeOf(u).name:'Selecteer een tegel';
+$('details').textContent=u?'❤️ '+u.hp+'/'+typeOf(u).hp+' · ⚔️ '+typeOf(u).damage+' · 👟 '+typeOf(u).move+' · 🏹 '+typeOf(u).range+' · '+(u.moved?'Al verplaatst':'Klaar voor actie'):ct?ct.owner===0?'Jouw stad · +'+(ct.lv+2)+' sterren per beurt':ct.owner===1?'Vijandelijke stad':'Neutraal dorp':t?'Terrein: '+t.t:'Tik op een tegel om te starten';
+$('recruit').disabled=!ct||ct.owner!==0||state.stars[0]<typeOf({type:$('unitType').value}).cost||state.win!==null;$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?4+ct.lv*2:6)+'⭐)';
 }
 function pointIn(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes}return yes}
 function pick(px,py){for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
@@ -87,7 +92,7 @@ function tap(x,z){
  if(state.win!==null||combatBusy)return;
  const u=unit(x,z);
  if(active&&!active.moved){
-  const opponent=u&&u.owner===1&&dist(active,{x,z})===1?u:null;
+  const opponent=u&&u.owner===1&&dist(active,{x,z})<=typeOf(active).range?u:null;
   if(opponent){resolveCombat(active,opponent);return;}
   if(reachable(active).has(idx(x,z))){
    active.x=x;active.z=z;active.moved=true;
@@ -102,12 +107,12 @@ function tap(x,z){
  draw();
 }
 function checkWin(){if(!state.cities.some(v=>v.owner===1)){state.win=0;message('🏆 Overwinning! Alle vijandelijke steden veroverd.')}}
-function enemyTurn(){for(const enemy of [...state.units].filter(v=>v.owner===1)){const target=state.cities.filter(v=>v.owner===0).sort((a,b)=>dist(enemy,a)-dist(enemy,b))[0];if(!target)continue;const victim=state.units.find(v=>v.owner===0&&dist(enemy,v)===1);if(victim){victim.hp-=4;continue}const dirs=[[1,0],[0,1],[-1,0],[0,-1]].sort((a,b)=>Math.abs(enemy.x+a[0]-target.x)+Math.abs(enemy.z+a[1]-target.z)-Math.abs(enemy.x+b[0]-target.x)-Math.abs(enemy.z+b[1]-target.z));let d=dirs.find(([dx,dz])=>walk(state.tiles,enemy.x+dx,enemy.z+dz)&&!unit(enemy.x+dx,enemy.z+dz));if(d){enemy.x+=d[0];enemy.z+=d[1];let ct=city(enemy.x,enemy.z);if(ct&&ct.owner===0)ct.owner=1}}
+function enemyTurn(){for(const enemy of [...state.units].filter(v=>v.owner===1)){const target=state.cities.filter(v=>v.owner===0).sort((a,b)=>dist(enemy,a)-dist(enemy,b))[0];if(!target)continue;const victim=state.units.find(v=>v.owner===0&&dist(enemy,v)<=typeOf(enemy).range);if(victim){victim.hp-=typeOf(enemy).damage;continue}const dirs=[[1,0],[0,1],[-1,0],[0,-1]].sort((a,b)=>Math.abs(enemy.x+a[0]-target.x)+Math.abs(enemy.z+a[1]-target.z)-Math.abs(enemy.x+b[0]-target.x)-Math.abs(enemy.z+b[1]-target.z));let d=dirs.find(([dx,dz])=>walk(state.tiles,enemy.x+dx,enemy.z+dz)&&!unit(enemy.x+dx,enemy.z+dz));if(d){enemy.x+=d[0];enemy.z+=d[1];let ct=city(enemy.x,enemy.z);if(ct&&ct.owner===0)ct.owner=1}}
 state.units=state.units.filter(u=>u.hp>0);
-if(state.stars[1]>=3&&state.units.filter(u=>u.owner===1).length<5){let ct=state.cities.find(v=>v.owner===1),spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];let p=ct&&spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(ct&&p){state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:1,hp:10,moved:true});state.stars[1]-=3}}
+if(state.stars[1]>=3&&state.units.filter(u=>u.owner===1).length<5){let ct=state.cities.find(v=>v.owner===1),spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];let p=ct&&spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(ct&&p){const kind=state.stars[1]>=7&&state.turn>5?'knight':state.stars[1]>=5&&state.turn>2?'archer':'warrior';state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:1,type:kind,hp:TYPES[kind].hp,moved:true});state.stars[1]-=TYPES[kind].cost}}
 if(!state.cities.some(v=>v.owner===0)){state.win=1;message('Je rijk is gevallen. Probeer opnieuw.')}} 
 $('end').onclick=()=>{if(state.win!==null||combatBusy)return;const gained=income(0);state.stars[0]+=gained;state.stars[1]+=income(1);state.turn++;state.units.forEach(u=>{u.moved=false;u.attacked=false});enemyTurn();selected=null;active=null;if(state.win===null)message('Beurt '+state.turn+' · +'+gained+' sterren');save();draw()};
-$('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(combatBusy||!ct||ct.owner!==0||state.stars[0]<3)return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,hp:10,moved:true});state.stars[0]-=3;message('Nieuwe krijger gerekruteerd');save();draw()};
+$('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);const kind=$('unitType').value,spec=TYPES[kind];if(combatBusy||!ct||ct.owner!==0||state.stars[0]<spec.cost)return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,type:kind,hp:spec.hp,moved:true});state.stars[0]-=spec.cost;message('Nieuwe '+spec.name.toLowerCase()+' gerekruteerd');save();draw()};
 $('upgrade').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(combatBusy||!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2)return;state.stars[0]-=4+ct.lv*2;ct.lv++;message(ct.name+' geüpgraded!');save();draw()};
 $('reset').onclick=()=>{if(confirm('Een nieuw spel starten?'))init()};
 function resize(){const d=Math.min(devicePixelRatio||1,2);w=c.clientWidth;h=c.clientHeight;c.width=w*d;c.height=h*d;ctx.setTransform(d,0,0,d,0,0);draw()}addEventListener('resize',resize);
@@ -116,5 +121,6 @@ c.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,d
 c.addEventListener('pointerup',e=>{if(drag&&!drag.moved){const t=pick(e.clientX,e.clientY);if(t)tap(t.x,t.z)}drag=null});
 c.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.55,Math.min(2.1,zoom*(e.deltaY>0?.91:1.1)));draw()},{passive:false});
 let oldDist=0;c.addEventListener('touchmove',e=>{if(e.touches.length===2){let a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(oldDist)zoom=Math.max(.55,Math.min(2.1,zoom*d/oldDist));oldDist=d;drag=null;draw()}},{passive:true});c.addEventListener('touchend',()=>oldDist=0);
+$('unitType').addEventListener('change',draw);
 try{const prior=JSON.parse(localStorage.getItem('kingdoms-of-vale-01'));if(prior&&prior.state&&prior.state.tiles.length===N*N){state=prior.state;seed=prior.seed;selected=null;active=null;message('Opgeslagen spel geladen.')}else init()}catch{init()}resize();
 })();
