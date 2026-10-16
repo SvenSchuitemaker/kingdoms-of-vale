@@ -16,6 +16,20 @@ state={tiles,cities,units:[{id:1,x:4,z:3,owner:0,hp:10,moved:false},{id:2,x:9,z:
 selected=null;active=null;panX=0;panY=0;zoom=1;message('Welkom in Kingdoms of Vale!');save();draw()}
 function walk(ts,x,z){return inside(x,z)&&!['water','mountain'].includes(ts[idx(x,z)].t)}
 const tile=(x,z)=>inside(x,z)?state.tiles[idx(x,z)]:null,city=(x,z)=>state.cities.find(v=>v.x===x&&v.z===z),unit=(x,z)=>state.units.find(v=>v.x===x&&v.z===z);
+// Breadth-first search: only reachable tiles are shown. Units cannot cross blockers.
+const MOVE_RANGE=2;
+function reachable(u){
+ const visited=new Set([idx(u.x,u.z)]),queue=[{x:u.x,z:u.z,steps:0}],result=new Set();
+ for(let i=0;i<queue.length;i++){
+  const p=queue[i];if(p.steps>=MOVE_RANGE)continue;
+  for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+   const x=p.x+dx,z=p.z+dz,k=idx(x,z);
+   if(!walk(state.tiles,x,z)||visited.has(k)||unit(x,z))continue;
+   visited.add(k);result.add(k);queue.push({x,z,steps:p.steps+1});
+  }
+ }
+ return result;
+}
 const income=owner=>state.cities.filter(v=>v.owner===owner).reduce((a,v)=>a+2+v.lv,0);
 function message(t){$('message').textContent=t}
 function save(){localStorage.setItem('kingdoms-of-vale-01',JSON.stringify({seed,state}))}
@@ -27,15 +41,15 @@ function tree(x,y){polygon([[x,y-34],[x-12,y-8],[x+12,y-8]],'#1f6c37');polygon([
 function hill(x,y){polygon([[x-22,y-8],[x,y-40],[x+22,y-8]],'#82918b');polygon([[x,y-40],[x+22,y-8],[x+2,y-8]],'#4b656f');polygon([[x-7,y-28],[x,y-40],[x+9,y-26]],'#e5f5ec')}
 function soldier(x,y,u){const blue=u.owner===0;polygon([[x-7,y-10],[x,y-15],[x+7,y-10],[x+7,y-1],[x,y+4],[x-7,y-1]],blue?'#2b93d8':'#cb5c68');ctx.fillStyle='#f8dbab';ctx.beginPath();ctx.arc(x,y-19,6,0,7);ctx.fill();ctx.fillStyle=blue?'#224b7e':'#742f46';ctx.fillRect(x-7,y-27,14,5);ctx.fillStyle='#1d2431';ctx.fillRect(x+8,y-13,2,23);ctx.fillStyle='#faeea9';ctx.fillRect(x+7,y-15,4,7);ctx.fillStyle='#26333c';ctx.fillRect(x-6,y+4,4,4);ctx.fillRect(x+3,y+4,4,4);ctx.fillStyle='#0009';ctx.fillRect(x-12,y+12,24,4);ctx.fillStyle=blue?'#65d4ff':'#ff9a99';ctx.fillRect(x-12,y+12,Math.max(0,u.hp/10)*24,4)}
 function coord(x,z){const unit=27*zoom;return [w/2+panX+(x-z)*unit,h*.30+panY+(x+z)*unit*.52]}
-function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];
+function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();
 for(let layer=0;layer<N*2;layer++)for(let z=0;z<N;z++){let x=layer-z;if(!inside(x,z))continue;const t=tile(x,z),[px,py]=coord(x,z),a=27*zoom,b=a*.52,highlight=selected&&selected.x===x&&selected.z===z;
 let colors={water:'#4da9bf',grass:'#83c868',forest:'#61ad5b',mountain:'#a1a69a',sand:'#eac879'},side={water:'#267b94',grass:'#528f4c',forest:'#438446',mountain:'#666f70',sand:'#cb9e53'};
 const p=[[px,py],[px+a,py+b],[px,py+2*b],[px-a,py+b]];hit.push({x,z,points:p,depth:layer});
-polygon([[px-a,py+b],[px,py+2*b],[px,py+2*b+8*zoom],[px-a,py+b+8*zoom]],side[t.t]);polygon([[px,py+2*b],[px+a,py+b],[px+a,py+b+8*zoom],[px,py+2*b+8*zoom]],side[t.t]);polygon(p,highlight?'#f7e5a0':colors[t.t],'#19393025');
+polygon([[px-a,py+b],[px,py+2*b],[px,py+2*b+8*zoom],[px-a,py+b+8*zoom]],side[t.t]);polygon([[px,py+2*b],[px+a,py+b],[px+a,py+b+8*zoom],[px,py+2*b+8*zoom]],side[t.t]);polygon(p,highlight?'#f7e5a0':moves.has(idx(x,z))?'#7cead4':colors[t.t],'#19393025');
 const cy=py+b;if(t.t==='forest')tree(px,cy);if(t.t==='mountain')hill(px,cy+5);if(t.t==='sand'&&t.r){ctx.fillStyle='#91a847';ctx.fillRect(px,cy-10,3,12)}if(t.t==='grass'&&t.r){ctx.fillStyle='#ead488';ctx.beginPath();ctx.arc(px,cy-6,4,0,7);ctx.fill()}
 const ct=city(x,z);if(ct)tower(px,cy-7,ct.owner,ct.lv);
 const u=unit(x,z);if(u)soldier(px+9,cy+3,u);
-if(active&&dist(active,{x,z})===1&&walk(state.tiles,x,z)&&(!unit(x,z)||unit(x,z).owner!==0)){ctx.strokeStyle='#ffea85';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
+if(moves.has(idx(x,z))){ctx.strokeStyle='#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
 }
 $('stars').textContent=state.stars[0];$('turn').textContent=state.turn;$('cities').textContent=state.cities.filter(v=>v.owner===0).length;$('units').textContent=state.units.filter(v=>v.owner===0).length;const ct=selected&&city(selected.x,selected.z),u=selected&&unit(selected.x,selected.z),t=selected&&tile(selected.x,selected.z);
 $('selection').textContent=ct?ct.name+' · niveau '+ct.lv:u?(u.owner===0?'Jouw krijger':'Vijandelijke krijger'):'Selecteer een tegel';
@@ -44,9 +58,28 @@ $('recruit').disabled=!ct||ct.owner!==0||state.stars[0]<3||state.win!==null;$('u
 }
 function pointIn(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes}return yes}
 function pick(px,py){for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
-function tap(x,z){if(state.win!==null)return;const u=unit(x,z);if(active&&dist(active,{x,z})===1&&walk(state.tiles,x,z)){const opponent=unit(x,z);if(opponent&&opponent.owner===1){opponent.hp-=5;active.moved=true;message('Aanval! 5 schade.');if(opponent.hp<=0)state.units=state.units.filter(v=>v!==opponent);active=null;save();draw();return}
-if(!opponent&&!active.moved){active.x=x;active.z=z;active.moved=true;let ct=city(x,z);if(ct&&ct.owner!==0){ct.owner=0;message(ct.name+' veroverd!')}else message('Krijger verplaatst.');active=null;checkWin();save();draw();return}}
-selected={x,z};active=u&&u.owner===0&&!u.moved?u:null;draw()}
+function tap(x,z){
+ if(state.win!==null)return;
+ const u=unit(x,z);
+ if(active&&!active.moved){
+  const opponent=u&&u.owner===1&&dist(active,{x,z})===1?u:null;
+  if(opponent){
+   opponent.hp-=5;active.moved=true;message('Aanval! 5 schade.');
+   if(opponent.hp<=0)state.units=state.units.filter(v=>v!==opponent);
+   active=null;save();draw();return;
+  }
+  if(reachable(active).has(idx(x,z))){
+   active.x=x;active.z=z;active.moved=true;
+   const ct=city(x,z);
+   if(ct&&ct.owner!==0){ct.owner=0;message(ct.name+' veroverd!')}
+   else message('Krijger verplaatst.');
+   selected={x,z};active=null;checkWin();save();draw();return;
+  }
+ }
+ selected={x,z};active=u&&u.owner===0&&!u.moved?u:null;
+ if(active)message('Groene vakjes: hier kun je naartoe lopen. Tik op je bestemming.');
+ draw();
+}
 function checkWin(){if(!state.cities.some(v=>v.owner===1)){state.win=0;message('🏆 Overwinning! Alle vijandelijke steden veroverd.')}}
 function enemyTurn(){for(const enemy of [...state.units].filter(v=>v.owner===1)){const target=state.cities.filter(v=>v.owner===0).sort((a,b)=>dist(enemy,a)-dist(enemy,b))[0];if(!target)continue;const victim=state.units.find(v=>v.owner===0&&dist(enemy,v)===1);if(victim){victim.hp-=4;continue}const dirs=[[1,0],[0,1],[-1,0],[0,-1]].sort((a,b)=>Math.abs(enemy.x+a[0]-target.x)+Math.abs(enemy.z+a[1]-target.z)-Math.abs(enemy.x+b[0]-target.x)-Math.abs(enemy.z+b[1]-target.z));let d=dirs.find(([dx,dz])=>walk(state.tiles,enemy.x+dx,enemy.z+dz)&&!unit(enemy.x+dx,enemy.z+dz));if(d){enemy.x+=d[0];enemy.z+=d[1];let ct=city(enemy.x,enemy.z);if(ct&&ct.owner===0)ct.owner=1}}
 state.units=state.units.filter(u=>u.hp>0);
