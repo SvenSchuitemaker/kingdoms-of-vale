@@ -1,0 +1,17 @@
+{
+  "name": "Kingdoms of Vale",
+  "short_name": "Kingdoms",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101f2c",
+  "theme_color": "#172b38",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
