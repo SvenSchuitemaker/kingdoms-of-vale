@@ -10,11 +10,11 @@ const tribes=[
 ];
 const $=id=>document.getElementById(id);let chosen='farming',pending='farming';
 const data=id=>tribes.find(t=>t.id===id)||tribes[0];
-function portrait(t){const el=document.createElement('span');el.className='tribeAvatar';el.dataset.tribe=t.id;el.textContent=t.icon;const img=new Image();img.src='./assets/tribes/'+t.id+'.webp';img.onload=()=>el.textContent='';return el}
+function portrait(t){const el=document.createElement('span');el.className='tribeAvatar';el.dataset.tribe=t.id;el.setAttribute('role','img');el.setAttribute('aria-label',t.name);return el}
 function updatePreview(){const t=data(pending);$('tribePreviewName').textContent=t.name+' · '+t.path;$('tribePreviewDescription').textContent=t.description;$('tribePreviewBonus').textContent=t.bonus;[...$('tribeGrid').children].forEach(e=>{const current=e.dataset.tribe===pending;e.classList.toggle('selected',current);e.setAttribute('aria-pressed',String(current))})}
 function show(){pending=chosen;$('tribeModal').hidden=false;updatePreview();$('closeTribes').focus()}
 function hide(){$('tribeModal').hidden=true;$('chooseTribe').focus()}
-function select(id){chosen=id;const t=data(id);$('tribeChoice').value=id;$('selectedTribeName').textContent=t.name;$('tribeDescription').textContent=t.description;const avatar=$('selectedTribeAvatar');avatar.replaceWith(portrait(t));$('selectedTribeAvatar')?.removeAttribute('id');const replacement=$('chooseTribe').querySelector('.tribeAvatar');replacement.id='selectedTribeAvatar'}
+function select(id){chosen=id;const t=data(id);$('tribeChoice').value=id;$('selectedTribeName').textContent=t.name;$('tribeDescription').textContent=t.description;const avatar=$('selectedTribeAvatar');avatar.replaceWith(portrait(t));$('chooseTribe').querySelector('.tribeAvatar').id='selectedTribeAvatar'}
 for(const t of tribes){const card=document.createElement('button');card.type='button';card.className='tribeCard';card.dataset.tribe=t.id;card.append(portrait(t));const title=document.createElement('b');title.textContent=t.name;const sub=document.createElement('small');sub.textContent=t.path;card.append(title,sub);card.onclick=()=>{pending=t.id;updatePreview()};$('tribeGrid').append(card)}
 $('chooseTribe').onclick=show;$('closeTribes').onclick=hide;$('confirmTribe').onclick=()=>{select(pending);hide()};
 $('tribeModal').addEventListener('click',e=>{if(e.target===$('tribeModal'))hide()});
