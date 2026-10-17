@@ -9,6 +9,31 @@ const branches=[
 {id:'mining',icon:'⛏️',name:'Mining',nodes:[{name:'Mijnbouw',cost:4,benefit:'+1 ster per beurt'},{name:'Edelstenen',cost:9,benefit:'Nog +2 sterren per beurt'}]}
 ];
 const level=(s,id)=>s.tech?.[id]||0;
+function showInfo(state,branch,node,index,onUnlock){
+ const modal=document.getElementById('techInfo');
+ const close=()=>{modal.hidden=true;document.removeEventListener('keydown',onKey)};
+ const onKey=e=>{if(e.key==='Escape')close()};
+ const owned=index<level(state,branch.id),ready=index===level(state,branch.id);
+ const affordable=state.stars[0]>=node.cost;
+ document.getElementById('techInfoIcon').textContent=branch.icon;
+ document.getElementById('techInfoTitle').textContent=node.name;
+ document.getElementById('techInfoBranch').textContent=branch.name+' · Niveau '+(index+1);
+ document.getElementById('techInfoBenefit').textContent=node.benefit;
+ document.getElementById('techInfoPrice').textContent='Kosten: '+node.cost+' ⭐ · Beschikbaar: '+state.stars[0]+' ⭐';
+ const status=document.getElementById('techInfoStatus');
+ status.textContent=owned?'Deze technologie is al onderzocht.':!ready?'Ontgrendel eerst de vorige technologie.':!affordable?'Je hebt nog '+(node.cost-state.stars[0])+' sterren nodig.':'Wil je deze technologie onderzoeken?';
+ const confirm=document.getElementById('techInfoConfirm');
+ confirm.disabled=owned||!ready||!affordable||state.win!==null;
+ confirm.textContent=owned?'Al ontgrendeld':ready?'Onderzoeken · '+node.cost+' ⭐':'Vergrendeld';
+ confirm.onclick=()=>{
+  if(level(state,branch.id)!==index||state.stars[0]<node.cost||state.win!==null)return;
+  state.stars[0]-=node.cost;state.tech[branch.id]=index+1;
+  close();onUnlock(branch.id,index,node.name);render(state,onUnlock);
+ };
+ document.getElementById('techInfoCancel').onclick=close;
+ modal.onclick=e=>{if(e.target===modal)close()};
+ modal.hidden=false;document.addEventListener('keydown',onKey);
+}
 function render(state,onUnlock){
  const root=document.getElementById('techBranches');root.replaceChildren();
  const board=document.createElement('div');board.className='techBoard';
@@ -34,8 +59,8 @@ function render(state,onUnlock){
    const label=document.createElement('span');label.className='techName';label.textContent=node.name;
    const price=document.createElement('span');price.className='techPrice';price.textContent=i<lv?'✓':node.cost+' ⭐';
    btn.append(symbol,label,price);btn.title=node.benefit;
-   btn.disabled=i!==lv||state.stars[0]<node.cost||state.win!==null;
-   btn.onclick=()=>{if(level(state,branch.id)!==i||state.stars[0]<node.cost)return;state.stars[0]-=node.cost;state.tech[branch.id]=i+1;onUnlock(branch.id,i,node.name);render(state,onUnlock)};
+   btn.disabled=false;
+   btn.onclick=()=>showInfo(state,branch,node,i,onUnlock);
    board.append(btn);
    previous=point;
   });
