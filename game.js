@@ -88,7 +88,7 @@ ctx.restore();
 const ct=city(x,z),u=unit(x,z);
 if(ct||u){ctx.save();ctx.translate(px,cy);ctx.scale(1.45*zoom,1.45*zoom);
 if(ct)tower(0,-7,ct.owner,ct.lv);
-if(u)soldier(9,3,u);
+if(u)soldier(0,3,u);
 ctx.restore()}
 if(moves.has(idx(x,z))||targets.has(idx(x,z))||heals.has(idx(x,z))){ctx.strokeStyle=targets.has(idx(x,z))?'#ff4444':heals.has(idx(x,z))?'#36ef75':'#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
 if(combat&&((combat.from.x===x&&combat.from.z===z)||(combat.to.x===x&&combat.to.z===z))){
@@ -103,7 +103,7 @@ $('recruit').disabled=!ct||ct.owner!==0||!canRecruit($('unitType').value)||state
 for(const opt of $('unitType').options){const open=canRecruit(opt.value);opt.disabled=!open;opt.textContent=(open?'':'🔒 ')+ICONS[opt.value]+' '+TYPES[opt.value].name+' · '+recruitCost(opt.value)+'⭐';}$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<cityCost(ct)||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?cityCost(ct):6)+'⭐)';
 }
 function pointIn(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes}return yes}
-function pick(px,py){for(const u of [...state.units].reverse()){const [ux,uy]=coord(u.x,u.z),sc=1.45*zoom,by=uy+21*zoom;if(Math.abs(px-(ux+9*sc))<15*sc&&py>=by-31*sc&&py<=by+17*sc)return {x:u.x,z:u.z}}for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
+function pick(px,py){for(const u of [...state.units].reverse()){const [ux,uy]=coord(u.x,u.z),sc=1.45*zoom,by=uy+21*zoom;if(Math.abs(px-ux)<15*sc&&py>=by-31*sc&&py<=by+17*sc)return {x:u.x,z:u.z}}for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
 function tap(x,z){
  if(state.win!==null||combatBusy)return;
  const u=unit(x,z);
