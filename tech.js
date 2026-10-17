@@ -1,12 +1,12 @@
 (function(){
 const branches=[
-{id:'farming',icon:'🌾',name:'Farming',nodes:[{name:'Irrigatie',cost:4,benefit:'+1 ster per stad per beurt'},{name:'Oogstfeest',cost:9,benefit:'Nog +1 ster per stad per beurt en ontgrendelt Healer'}]},
-{id:'fishing',icon:'🐟',name:'Fishing',nodes:[{name:'Visnetten',cost:4,benefit:'+1 ster per beurt'},{name:'Vishandel',cost:9,benefit:'Nog +2 sterren per beurt en ontgrendelt Harpooner'}]},
-{id:'lumber',icon:'🌲',name:'Lumber',nodes:[{name:'Houtbewerking',cost:4,benefit:'Stadsupgrades 1 ster goedkoper'},{name:'Zagerij',cost:9,benefit:'Nog 1 ster goedkoper en ontgrendelt Woodsman'}]},
-{id:'hunting',icon:'🏹',name:'Hunting',nodes:[{name:'Spoorzoeken',cost:4,benefit:'Ontgrendelt boogschutters'},{name:'Meesterschutters',cost:9,benefit:'Boogschutters +1 schade en 1 ster goedkoper; ontgrendelt Ranger'}]},
+{id:'farming',icon:'🌾',name:'Farming',nodes:[{name:'Irrigatie',cost:4,benefit:'+1 ster per stad per beurt'},{name:'Oogstfeest',cost:9,benefit:'Nog +1 ster per stad per beurt en ontgrendelt Giant'}]},
+{id:'fishing',icon:'🐟',name:'Fishing',nodes:[{name:'Visnetten',cost:4,benefit:'+1 ster per beurt'},{name:'Vishandel',cost:9,benefit:'Nog +2 sterren per beurt en ontgrendelt Catapult'}]},
+{id:'lumber',icon:'🌲',name:'Lumber',nodes:[{name:'Houtbewerking',cost:4,benefit:'Stadsupgrades 1 ster goedkoper'},{name:'Zagerij',cost:9,benefit:'Nog 1 ster goedkoper en ontgrendelt Ghost'}]},
+{id:'hunting',icon:'🏹',name:'Hunting',nodes:[{name:'Spoorzoeken',cost:4,benefit:'Ontgrendelt boogschutters'},{name:'Meesterschutters',cost:9,benefit:'Boogschutters +1 schade en 1 ster goedkoper; versterkt boogschutters'}]},
 {id:'magic',icon:'✨',name:'Magic',nodes:[{name:'Runenleer',cost:4,benefit:'Alle eigen eenheden +1 maximale HP en ontgrendelt Mage'},{name:'Betovering',cost:9,benefit:'Alle eigen eenheden +1 aanvalsschade'}]},
-{id:'building',icon:'🏛️',name:'Building',nodes:[{name:'Metselen',cost:4,benefit:'Stadsupgrades 1 ster goedkoper en ontgrendelt Guardian'},{name:'Vestingbouw',cost:9,benefit:'Ontgrendelt ridders en +1 ster per stad per beurt'}]},
-{id:'mining',icon:'⛏️',name:'Mining',nodes:[{name:'Mijnbouw',cost:4,benefit:'+1 ster per beurt'},{name:'Edelstenen',cost:9,benefit:'Nog +2 sterren per beurt en ontgrendelt Golem'}]}
+{id:'building',icon:'🏛️',name:'Building',nodes:[{name:'Metselen',cost:4,benefit:'Stadsupgrades 1 ster goedkoper en ontgrendelt Golem'},{name:'Vestingbouw',cost:9,benefit:'Ontgrendelt ridders en +1 ster per stad per beurt'}]},
+{id:'mining',icon:'⛏️',name:'Mining',nodes:[{name:'Mijnbouw',cost:4,benefit:'+1 ster per beurt'},{name:'Edelstenen',cost:9,benefit:'Nog +2 sterren per beurt en versterkt Golems'}]}
 ];
 const level=(s,id)=>s.tech?.[id]||0;
 function showInfo(state,branch,node,index,onUnlock){
@@ -70,7 +70,7 @@ function render(state,onUnlock){
 
 window.GameTech={branches,level,render,
 income:(s)=>{const cities=s.cities.filter(v=>v.owner===0).length;return cities*(level(s,'farming')+(level(s,'building')>=2?1:0))+(level(s,'fishing')>=1?1:0)+(level(s,'fishing')>=2?2:0)+(level(s,'mining')>=1?1:0)+(level(s,'mining')>=2?2:0)},
-unlocked:(s,kind)=>({warrior:true,archer:level(s,'hunting')>=1,ranger:level(s,'hunting')>=2,mage:level(s,'magic')>=1,knight:level(s,'building')>=2,guardian:level(s,'building')>=1,harpooner:level(s,'fishing')>=2,woodsman:level(s,'lumber')>=2,healer:level(s,'farming')>=2,golem:level(s,'mining')>=2}[kind]===true),
+unlocked:(s,kind)=>({warrior:true,archer:level(s,'hunting')>=1,mage:level(s,'magic')>=1,knight:level(s,'building')>=2,golem:level(s,'mining')>=2||level(s,'building')>=1,ghost:level(s,'lumber')>=2,catapult:level(s,'fishing')>=2,giant:level(s,'farming')>=2}[kind]===true),
 unitCost:(s,kind,cost)=>Math.max(1,cost-(kind==='archer'&&level(s,'hunting')>=2?1:0)),
 cityCost:(s,ct)=>Math.max(1,4+ct.lv*2-level(s,'lumber')-(level(s,'building')>=1?1:0)),
 damage:(s,u,base)=>base+(u.owner===0?((u.type==='archer'&&level(s,'hunting')>=2?1:0)+(level(s,'magic')>=2?1:0)):0),
