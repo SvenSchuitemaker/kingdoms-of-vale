@@ -7,6 +7,7 @@ const tech=window.GameTech;
 const damage=u=>tech.damage(state,u,typeOf(u).damage);
 const maxHp=u=>tech.maxHp(state,u,typeOf(u).hp);
 const recruitCost=kind=>tech.unitCost(state,kind,TYPES[kind].cost);
+const canRecruit=kind=>tech.unlocked(state,kind);
 const cityCost=ct=>tech.cityCost(state,ct);
 const rand=(x,z,s)=>{const n=Math.sin((x+17)*127.1+(z+29)*311.7+s*74.7)*43758.5453;return n-Math.floor(n)};
 const idx=(x,z)=>z*N+x,inside=(x,z)=>x>=0&&z>=0&&x<N&&z<N;
@@ -96,7 +97,8 @@ if(combat&&((combat.from.x===x&&combat.from.z===z)||(combat.to.x===x&&combat.to.
 $('stars').textContent=state.stars[0];$('turn').textContent=state.turn;$('cities').textContent=state.cities.filter(v=>v.owner===0).length;$('units').textContent=state.units.filter(v=>v.owner===0).length;const ct=selected&&city(selected.x,selected.z),u=selected&&unit(selected.x,selected.z),t=selected&&tile(selected.x,selected.z);
 $('selection').textContent=ct?ct.name+' · niveau '+ct.lv:u?(u.owner===0?'Jouw ':'Vijandelijke ')+typeOf(u).name:'Selecteer een tegel';
 $('details').textContent=u?'❤️ '+u.hp+'/'+maxHp(u)+' · ⚔️ '+damage(u)+' · 👟 '+typeOf(u).move+' · 🏹 '+typeOf(u).range+' · '+(u.moved?'Al verplaatst':'Klaar voor actie'):ct?ct.owner===0?'Jouw stad · +'+(ct.lv+2)+' sterren per beurt':ct.owner===1?'Vijandelijke stad':'Neutraal dorp':t?'Terrein: '+t.t:'Tik op een tegel om te starten';
-$('recruit').disabled=!ct||ct.owner!==0||state.stars[0]<recruitCost($('unitType').value)||state.win!==null;$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<cityCost(ct)||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?cityCost(ct):6)+'⭐)';
+$('recruit').disabled=!ct||ct.owner!==0||!canRecruit($('unitType').value)||state.stars[0]<recruitCost($('unitType').value)||state.win!==null;
+for(const opt of $('unitType').options){const open=canRecruit(opt.value);opt.disabled=!open;opt.textContent=(open?'':'🔒 ')+({warrior:'⚔️ Krijger',archer:'🏹 Boogschutter',knight:'🐴 Ridder'}[opt.value])+' · '+recruitCost(opt.value)+'⭐';}$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<cityCost(ct)||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?cityCost(ct):6)+'⭐)';
 }
 function pointIn(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes}return yes}
 function pick(px,py){for(const u of [...state.units].reverse()){const [ux,uy]=coord(u.x,u.z),sc=1.45*zoom,by=uy+21*zoom;if(Math.abs(px-(ux+9*sc))<15*sc&&py>=by-31*sc&&py<=by+17*sc)return {x:u.x,z:u.z}}for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
@@ -124,7 +126,7 @@ state.units=state.units.filter(u=>u.hp>0);
 if(state.stars[1]>=3&&state.units.filter(u=>u.owner===1).length<5){let ct=state.cities.find(v=>v.owner===1),spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];let p=ct&&spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(ct&&p){const kind=state.stars[1]>=7&&state.turn>5?'knight':state.stars[1]>=5&&state.turn>2?'archer':'warrior';state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:1,type:kind,hp:TYPES[kind].hp,moved:true});state.stars[1]-=TYPES[kind].cost}}
 if(!state.cities.some(v=>v.owner===0)){state.win=1;message('Je rijk is gevallen. Probeer opnieuw.')}} 
 $('end').onclick=()=>{if(state.win!==null||combatBusy)return;const gained=income(0);state.stars[0]+=gained;state.stars[1]+=income(1);state.turn++;state.units.forEach(u=>{u.moved=false;u.attacked=false});enemyTurn();selected=null;active=null;if(state.win===null)message('Beurt '+state.turn+' · +'+gained+' sterren');save();draw()};
-$('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);const kind=$('unitType').value,spec=TYPES[kind];if(combatBusy||!ct||ct.owner!==0||state.stars[0]<recruitCost(kind))return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,type:kind,hp:spec.hp+(tech.level(state,'magic')>=1?1:0),moved:true});state.stars[0]-=recruitCost(kind);message('Nieuwe '+spec.name.toLowerCase()+' gerekruteerd');save();draw()};
+$('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);const kind=$('unitType').value,spec=TYPES[kind];if(combatBusy||!canRecruit(kind)||!ct||ct.owner!==0||state.stars[0]<recruitCost(kind))return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,type:kind,hp:spec.hp+(tech.level(state,'magic')>=1?1:0),moved:true});state.stars[0]-=recruitCost(kind);message('Nieuwe '+spec.name.toLowerCase()+' gerekruteerd');save();draw()};
 $('upgrade').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(combatBusy||!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2)return;state.stars[0]-=cityCost(ct);ct.lv++;message(ct.name+' geüpgraded!');save();draw()};
 $('reset').onclick=()=>{if(confirm('Een nieuw spel starten?'))init()};
 function resize(){const d=Math.min(devicePixelRatio||1,2);w=c.clientWidth;h=c.clientHeight;c.width=w*d;c.height=h*d;ctx.setTransform(d,0,0,d,0,0);draw()}addEventListener('resize',resize);
@@ -134,8 +136,8 @@ c.addEventListener('pointerup',e=>{if(drag&&!drag.moved){const t=pick(e.clientX,
 c.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.55,Math.min(2.1,zoom*(e.deltaY>0?.91:1.1)));draw()},{passive:false});
 let oldDist=0;c.addEventListener('touchmove',e=>{if(e.touches.length===2){let a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(oldDist)zoom=Math.max(.55,Math.min(2.1,zoom*d/oldDist));oldDist=d;drag=null;draw()}},{passive:true});c.addEventListener('touchend',()=>oldDist=0);
 $('unitType').addEventListener('change',draw);
-$('techOpen').onclick=()=>{tech.render(state,(id,step,name)=>{if(id==='magic'&&step===0)state.units.filter(u=>u.owner===0).forEach(u=>u.hp++);message(name+' onderzocht!');save();draw()});$('techOverlay').hidden=false};
+$('techOpen').onclick=()=>{tech.render(state,(id,step,name)=>{if(id==='magic'&&step===0)state.units.filter(u=>u.owner===0).forEach(u=>u.hp++);message(name+' onderzocht!');if(!canRecruit($('unitType').value))$('unitType').value='warrior';save();draw()});$('techOverlay').hidden=false};
 $('techClose').onclick=()=>{$('techOverlay').hidden=true};
 $('techOverlay').addEventListener('click',e=>{if(e.target===$('techOverlay'))$('techOverlay').hidden=true});
-try{const prior=JSON.parse(localStorage.getItem('kingdoms-of-vale-01'));if(prior&&prior.state&&prior.state.tiles.length===N*N){state=prior.state;seed=prior.seed;state.tech=state.tech||{};selected=null;active=null;message('Opgeslagen spel geladen.')}else init()}catch{init()}resize();
+try{const prior=JSON.parse(localStorage.getItem('kingdoms-of-vale-01'));if(prior&&prior.state&&prior.state.tiles.length===N*N){state=prior.state;seed=prior.seed;state.tech=state.tech||{};if(!tech.unlocked(state,$('unitType').value))$('unitType').value='warrior';selected=null;active=null;message('Opgeslagen spel geladen.')}else init()}catch{init()}resize();
 })();
