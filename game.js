@@ -87,7 +87,7 @@ if(t.t==='grass'&&t.r){ctx.fillStyle='#ead488';ctx.beginPath();ctx.arc(0,-6,4,0,
 ctx.restore();
 const ct=city(x,z),u=unit(x,z);
 if(ct||u){ctx.save();ctx.translate(px,cy);ctx.scale(1.45*zoom,1.45*zoom);
-if(ct)tower(0,-7,ct.owner,ct.lv);
+if(ct){const cityTribe=ct.owner<0?null:ownerTribe(ct.owner);if(!window.KovCastles.draw(ctx,cityTribe,ct.lv,0,11))tower(0,-7,ct.owner,ct.lv);}
 if(u)soldier(0,3,u);
 ctx.restore()}
 if(moves.has(idx(x,z))||targets.has(idx(x,z))||heals.has(idx(x,z))){ctx.strokeStyle=targets.has(idx(x,z))?'#ff4444':heals.has(idx(x,z))?'#36ef75':'#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
@@ -198,5 +198,5 @@ $('startGame').onclick=()=>{
 $('backHome').onclick=showHome;
 const old=localStorage.getItem('kingdoms-of-vale-01');
 if(old&&!localStorage.getItem('kov-migrated')){if(!localStorage.getItem('kov-save-0')){try{const prior=JSON.parse(old);if(prior?.state?.tiles){prior.state.settings={tribe:'farming',mode:'classic',victory:'conquest',aiCount:1,mapSize:14};prior.state.score=[0,0];localStorage.setItem('kov-save-0',JSON.stringify({seed:prior.seed,state:prior.state,N:14,updated:Date.now()}))}}catch{}}localStorage.setItem('kov-migrated','1')}
-window.addEventListener('kov-sprite-ready',()=>draw());resize();showHome();
+window.addEventListener('kov-sprite-ready',()=>draw());window.addEventListener('kov-castle-ready',()=>draw());resize();showHome();
 })();
