@@ -125,7 +125,7 @@ function tap(x,z){
   u.hp=Math.min(maxHp(u),u.hp+5);active.moved=true;message('💚 Healer herstelt 5 HP');active=null;selected={x,z};save();draw();return;
  }
  if(active&&!active.moved){
-  const opponent=u&&u.owner===1&&dist(active,{x,z})<=typeOf(active).range?u:null;
+  const opponent=u&&u.owner!==0&&dist(active,{x,z})<=typeOf(active).range?u:null;
   if(opponent){resolveCombat(active,opponent);return;}
   if(reachable(active).has(idx(x,z))){
    active.x=x;active.z=z;active.moved=true;
@@ -140,11 +140,29 @@ function tap(x,z){
  draw();
 }
 function checkWin(){if(state.settings?.victory==='legacy'){if(state.score[0]>=state.settings.goal){state.win=0;message('🏆 Legacy gewonnen! De doelscore is bereikt.')}else if(state.score.slice(1).some(v=>v>=state.settings.goal)){state.win=1;message('De rivalen hebben de Legacy-doelscore bereikt.')}return}if(!state.cities.some(v=>v.owner>0)){state.win=0;message('🏆 Conquest gewonnen! Alle rivalen verslagen.')}}
-function enemyTurn(){for(const enemy of [...state.units].filter(v=>v.owner===1)){const target=state.cities.filter(v=>v.owner===0).sort((a,b)=>dist(enemy,a)-dist(enemy,b))[0];if(!target)continue;const victim=state.units.find(v=>v.owner===0&&dist(enemy,v)<=typeOf(enemy).range);if(victim){victim.hp-=damage(enemy);continue}const dirs=[[1,0],[0,1],[-1,0],[0,-1]].sort((a,b)=>Math.abs(enemy.x+a[0]-target.x)+Math.abs(enemy.z+a[1]-target.z)-Math.abs(enemy.x+b[0]-target.x)-Math.abs(enemy.z+b[1]-target.z));let d=dirs.find(([dx,dz])=>walk(state.tiles,enemy.x+dx,enemy.z+dz)&&!unit(enemy.x+dx,enemy.z+dz));if(d){enemy.x+=d[0];enemy.z+=d[1];let ct=city(enemy.x,enemy.z);if(ct&&ct.owner===0)ct.owner=1}}
-state.units=state.units.filter(u=>u.hp>0);
-if(state.stars[1]>=3&&state.units.filter(u=>u.owner===1).length<5){let ct=state.cities.find(v=>v.owner===1),spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];let p=ct&&spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(ct&&p){const kind=state.stars[1]>=7&&state.turn>5?'knight':state.stars[1]>=5&&state.turn>2?'archer':'warrior';state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:1,type:kind,hp:TYPES[kind].hp,moved:true});state.stars[1]-=TYPES[kind].cost}}
-if(!state.cities.some(v=>v.owner===0)){state.win=1;message('Je rijk is gevallen. Probeer opnieuw.')}} 
-$('end').onclick=()=>{if(state.win!==null||combatBusy)return;const gained=income(0);if(state.settings?.victory==='legacy'){for(let owner=0;owner<state.stars.length;owner++)state.score[owner]+=state.cities.filter(c=>c.owner===owner).reduce((n,c)=>n+5*c.lv,0)+state.units.filter(u=>u.owner===owner).length*2+(owner===0?Object.values(state.tech).reduce((n,v)=>n+v*3,0):0)}state.stars[0]+=gained;state.stars[1]+=income(1);state.turn++;state.units.forEach(u=>{u.moved=false;u.attacked=false});enemyTurn();checkWin();selected=null;active=null;if(state.win===null)message('Beurt '+state.turn+' · +'+gained+' sterren'+(state.settings?.victory==='legacy'?' · '+state.score[0]+'/'+state.settings.goal+' Legacy-punten':''));save();draw()};
+function enemyTurn(){
+ for(let owner=1;owner<state.stars.length;owner++){
+  state.stars[owner]+=income(owner);
+  for(const enemy of [...state.units].filter(v=>v.owner===owner)){
+   const enemies=state.cities.filter(v=>v.owner!==owner&&v.owner>=0);
+   const target=enemies.sort((a,b)=>dist(enemy,a)-dist(enemy,b))[0];if(!target)continue;
+   const victim=state.units.find(v=>v.owner!==owner&&dist(enemy,v)<=typeOf(enemy).range);
+   if(victim){victim.hp-=damage(enemy);continue}
+   const dirs=[[1,0],[0,1],[-1,0],[0,-1]].sort((a,b)=>Math.abs(enemy.x+a[0]-target.x)+Math.abs(enemy.z+a[1]-target.z)-Math.abs(enemy.x+b[0]-target.x)-Math.abs(enemy.z+b[1]-target.z));
+   const step=dirs.find(([dx,dz])=>walk(state.tiles,enemy.x+dx,enemy.z+dz)&&!unit(enemy.x+dx,enemy.z+dz));
+   if(step){enemy.x+=step[0];enemy.z+=step[1];const ct=city(enemy.x,enemy.z);if(ct&&ct.owner!==owner)ct.owner=owner}
+  }
+  state.units=state.units.filter(u=>u.hp>0);
+  const ct=state.cities.find(v=>v.owner===owner);
+  if(ct&&state.stars[owner]>=3&&state.units.filter(u=>u.owner===owner).length<5){
+   const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];
+   const spot=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));
+   if(spot){const kind=state.stars[owner]>=7&&state.turn>5?'knight':state.stars[owner]>=5&&state.turn>2?'archer':'warrior';state.units.push({id:state.seq++,x:ct.x+spot[0],z:ct.z+spot[1],owner,type:kind,hp:TYPES[kind].hp,moved:true});state.stars[owner]-=TYPES[kind].cost}
+  }
+ }
+ if(!state.cities.some(v=>v.owner===0)){state.win=1;message('Je rijk is gevallen. Probeer opnieuw.')}
+}
+$('end').onclick=()=>{if(state.win!==null||combatBusy)return;const gained=income(0);if(state.settings?.victory==='legacy'){for(let owner=0;owner<state.stars.length;owner++)state.score[owner]+=state.cities.filter(c=>c.owner===owner).reduce((n,c)=>n+5*c.lv,0)+state.units.filter(u=>u.owner===owner).length*2+(owner===0?Object.values(state.tech).reduce((n,v)=>n+v*3,0):0)}state.stars[0]+=gained;state.turn++;state.units.forEach(u=>{u.moved=false;u.attacked=false});enemyTurn();checkWin();selected=null;active=null;if(state.win===null)message('Beurt '+state.turn+' · +'+gained+' sterren'+(state.settings?.victory==='legacy'?' · '+state.score[0]+'/'+state.settings.goal+' Legacy-punten':''));save();draw()};
 $('recruit').onclick=()=>{const ct=selected&&city(selected.x,selected.z);const kind=$('unitType').value,spec=TYPES[kind];if(combatBusy||!canRecruit(kind)||!ct||ct.owner!==0||state.stars[0]<recruitCost(kind))return;const spots=[[0,0],[1,0],[-1,0],[0,1],[0,-1]],p=spots.find(([dx,dz])=>walk(state.tiles,ct.x+dx,ct.z+dz)&&!unit(ct.x+dx,ct.z+dz));if(!p){message('Geen plek voor een krijger.');return}state.units.push({id:state.seq++,x:ct.x+p[0],z:ct.z+p[1],owner:0,type:kind,hp:spec.hp+(tech.level(state,'magic')>=1?1:0),moved:true});state.stars[0]-=recruitCost(kind);message('Nieuwe '+spec.name.toLowerCase()+' gerekruteerd');save();draw()};
 $('upgrade').onclick=()=>{const ct=selected&&city(selected.x,selected.z);if(combatBusy||!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<4+ct.lv*2)return;state.stars[0]-=cityCost(ct);ct.lv++;message(ct.name+' geüpgraded!');save();draw()};
 $('reset').onclick=()=>{if(confirm('Terug naar het hoofdmenu? Je spel blijft opgeslagen.'))showHome()};
