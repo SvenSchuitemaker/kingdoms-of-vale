@@ -1,20 +1,15 @@
 (()=>{'use strict';
 let N=16;const c=document.getElementById('game'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);
 let w=0,h=0,zoom=1,panX=0,panY=0,selected=null,active=null,hit=[],drag=null,seed=0,state=null,combat=null,combatBusy=false,currentSlot=-1;
-const TYPES={warrior:{name:'Krijger',cost:3,hp:10,damage:5,move:2,range:1},archer:{name:'Boogschutter',cost:5,hp:7,damage:4,move:2,range:3},knight:{name:'Ridder',cost:7,hp:14,damage:6,move:3,range:1},
-ranger:{name:'Ranger',cost:8,hp:9,damage:6,move:3,range:3},
-mage:{name:'Mage',cost:7,hp:8,damage:7,move:2,range:2},
-guardian:{name:'Guardian',cost:6,hp:18,damage:4,move:1,range:1},
-harpooner:{name:'Harpooner',cost:6,hp:11,damage:5,move:2,range:2},
-woodsman:{name:'Woodsman',cost:6,hp:12,damage:7,move:2,range:1},
-healer:{name:'Healer',cost:6,hp:9,damage:2,move:2,range:1},
-golem:{name:'Golem',cost:10,hp:22,damage:8,move:1,range:1}};
+const TYPES={warrior:{name:'Warrior',cost:3,hp:10,damage:5,move:2,range:1},knight:{name:'Knight',cost:7,hp:14,damage:6,move:3,range:1},golem:{name:'Golem',cost:10,hp:22,damage:8,move:1,range:1},archer:{name:'Archer',cost:5,hp:7,damage:4,move:2,range:3},mage:{name:'Mage',cost:7,hp:8,damage:7,move:2,range:2},ghost:{name:'Ghost',cost:8,hp:9,damage:6,move:3,range:1},catapult:{name:'Catapult',cost:11,hp:8,damage:8,move:1,range:4},giant:{name:'Giant',cost:13,hp:28,damage:9,move:1,range:1}};
 const typeOf=u=>TYPES[u.type]||TYPES.warrior;
 const tech=window.GameTech;
 const damage=u=>tech.damage(state,u,typeOf(u).damage);
 const maxHp=u=>tech.maxHp(state,u,typeOf(u).hp);
 const recruitCost=kind=>tech.unitCost(state,kind,TYPES[kind].cost);
-const ICONS={warrior:'⚔️',archer:'🏹',knight:'🐴',ranger:'🎯',mage:'🔮',guardian:'🛡️',harpooner:'🔱',woodsman:'🪓',healer:'💚',golem:'🪨'};
+const ICONS={warrior:'⚔️',knight:'🐴',golem:'🪨',archer:'🏹',mage:'🔮',ghost:'👻',catapult:'💥',giant:'🗿'};
+const sprites=window.KovSprites;
+const ownerTribe=owner=>owner===0?sprites.tribe(state.settings?.tribe):sprites.tribe(state.settings?.aiTribes?.[owner-1]);
 const canRecruit=kind=>tech.unlocked(state,kind);
 const cityCost=ct=>tech.cityCost(state,ct);
 const rand=(x,z,s)=>{const n=Math.sin((x+17)*127.1+(z+29)*311.7+s*74.7)*43758.5453;return n-Math.floor(n)};
@@ -30,7 +25,7 @@ for(let x=3;x<N-3;x++)tiles[idx(x,3)].t='grass';for(let z=3;z<N-3;z++)tiles[idx(
 let cities=starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({x,z,owner,lv:1,name:owner===0?'Hoofdstad':'Rivalenstad '+owner}));
 const names=['Berkwoud','Zonnehaven','Westwacht','Kristalstad','Morgenveld'];
 for(let i=0;i<7;i++){let x=1+Math.floor(rand(i,3,s)*(N-2)),z=1+Math.floor(rand(i,9,s)*(N-2));if(walk(tiles,x,z)&&!cities.some(k=>Math.abs(k.x-x)+Math.abs(k.z-z)<4))cities.push({x,z,owner:-1,lv:1,name:names[i%names.length]})}
-state={tiles,cities,units:starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({id:owner+1,x:owner===0?x+1:x-1,z,owner,hp:10,moved:false,type:'warrior'})),stars:Array(1+(settings.aiCount||1)).fill(7),turn:1,seq:2+(settings.aiCount||1),win:null,tech:settings.tribe?{[settings.tribe]:1}:{},settings:{...settings},score:Array(1+(settings.aiCount||1)).fill(0)};
+state={tiles,cities,units:starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({id:owner+1,x:owner===0?x+1:x-1,z,owner,hp:10,moved:false,type:'warrior'})),stars:Array(1+(settings.aiCount||1)).fill(7),turn:1,seq:2+(settings.aiCount||1),win:null,tech:settings.tribe?{[settings.tribe]:1}:{},settings:{...settings,aiTribes:Array.from({length:settings.aiCount||1},(_,i)=>{const options=sprites.tribes.filter(t=>t!==sprites.tribe(settings.tribe));return options[i%options.length]})},score:Array(1+(settings.aiCount||1)).fill(0)};
 selected=null;active=null;panX=0;panY=0;zoom=1;message('Welkom in Kingdoms of Vale!');save();draw()}
 function walk(ts,x,z){return inside(x,z)&&!['water','mountain'].includes(ts[idx(x,z)].t)}
 const tile=(x,z)=>inside(x,z)?state.tiles[idx(x,z)]:null,city=(x,z)=>state.cities.find(v=>v.x===x&&v.z===z),unit=(x,z)=>state.units.find(v=>v.x===x&&v.z===z);
@@ -78,16 +73,7 @@ function tower(x,y,owner,lv){let top=y-15-lv*3,color=owner===0?'#30bce2':owner==
 function cityLabel(owner){return owner===0?'◆':owner===1?'◇':'•'}
 function tree(x,y){polygon([[x,y-34],[x-12,y-8],[x+12,y-8]],'#1f6c37');polygon([[x,y-42],[x-10,y-22],[x+10,y-22]],'#359c4a');ctx.fillStyle='#74583d';ctx.fillRect(x-2,y-9,4,9)}
 function hill(x,y){polygon([[x-22,y-8],[x,y-40],[x+22,y-8]],'#82918b');polygon([[x,y-40],[x+22,y-8],[x+2,y-8]],'#4b656f');polygon([[x-7,y-28],[x,y-40],[x+9,y-26]],'#e5f5ec')}
-function soldier(x,y,u){const blue=u.owner===0;polygon([[x-7,y-10],[x,y-15],[x+7,y-10],[x+7,y-1],[x,y+4],[x-7,y-1]],blue?'#2b93d8':'#cb5c68');ctx.fillStyle='#f8dbab';ctx.beginPath();ctx.arc(x,y-19,6,0,7);ctx.fill();ctx.fillStyle=blue?'#224b7e':'#742f46';ctx.fillRect(x-7,y-27,14,5);ctx.fillStyle='#1d2431';
-if(u.type==='archer'){ctx.strokeStyle='#ffe09a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+10,y-12,8,-1.3,1.3);ctx.stroke();ctx.fillRect(x+8,y-21,2,19)}
-else if(u.type==='mage'){ctx.fillStyle='#b889e9';ctx.fillRect(x+8,y-26,4,35);ctx.fillStyle='#eed3ff';ctx.beginPath();ctx.arc(x+10,y-29,5,0,7);ctx.fill()}
-else if(u.type==='ranger'||u.type==='harpooner'){ctx.strokeStyle='#f4eaa1';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+10,y-12,10,-1.4,1.4);ctx.stroke();ctx.fillRect(x+8,y-23,2,24)}
-else if(u.type==='healer'){ctx.fillStyle='#7fffb1';ctx.fillRect(x+8,y-24,4,31);ctx.fillRect(x+4,y-18,12,4)}
-else if(u.type==='woodsman'){ctx.fillStyle='#d8e3ed';ctx.fillRect(x+8,y-27,13,9);ctx.fillStyle='#72523d';ctx.fillRect(x+10,y-20,3,26)}
-else if(u.type==='golem'){ctx.fillStyle='#8a9dab';ctx.fillRect(x-12,y-26,24,24);ctx.fillStyle='#a5c8cb';ctx.fillRect(x-5,y-20,4,4);ctx.fillRect(x+5,y-20,4,4)}
-else if(u.type==='guardian'){ctx.fillStyle='#d5e4f1';ctx.fillRect(x-12,y-15,20,22);ctx.fillStyle='#efcc82';ctx.fillRect(x+10,y-20,3,27)}
-else if(u.type==='knight'){ctx.fillStyle='#c8cbd5';ctx.fillRect(x-8,y-13,17,17);ctx.fillStyle='#f5d06c';ctx.fillRect(x+8,y-17,3,26)}
-else{ctx.fillRect(x+8,y-13,2,23);ctx.fillStyle='#faeea9';ctx.fillRect(x+7,y-15,4,7)}ctx.fillStyle='#26333c';ctx.fillRect(x-6,y+4,4,4);ctx.fillRect(x+3,y+4,4,4);ctx.fillStyle='#0009';ctx.fillRect(x-12,y+12,24,4);ctx.fillStyle=blue?'#65d4ff':'#ff9a99';ctx.fillRect(x-12,y+12,Math.max(0,u.hp/maxHp(u))*24,4)}
+function soldier(x,y,u){const tribe=ownerTribe(u.owner);const big=u.type==='giant'||u.type==='golem';const width=big?47:38,height=big?58:48;const floor=y+9;ctx.fillStyle=u.owner===0?'#44d2e499':'#ffac6899';ctx.beginPath();ctx.ellipse(x,floor,14,5,0,0,Math.PI*2);ctx.fill();sprites.draw(ctx,tribe,u.type,x,floor,width,height);ctx.fillStyle='#101a2299';ctx.fillRect(x-14,y+15,28,5);ctx.fillStyle=u.owner===0?'#65d4ff':'#ff9a99';ctx.fillRect(x-14,y+15,Math.max(0,u.hp/maxHp(u))*28,5)}
 function coord(x,z){const unit=42*zoom;return [w/2+panX+(x-z)*unit,h*.30+panY+(x+z)*unit*.52]}
 function draw(){if(!ctx||!state)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();const targets=active&&!active.moved?new Set(attackTargets(active).map(v=>idx(v.x,v.z))):new Set();const heals=active&&!active.moved&&active.type==='healer'?new Set(state.units.filter(v=>v.owner===0&&v!==active&&dist(active,v)===1&&v.hp<maxHp(v)).map(v=>idx(v.x,v.z))):new Set();
 for(let layer=0;layer<N*2;layer++)for(let z=0;z<N;z++){let x=layer-z;if(!inside(x,z))continue;const t=tile(x,z),[px,py]=coord(x,z),a=42*zoom,b=a*.52,highlight=selected&&selected.x===x&&selected.z===z;
@@ -198,7 +184,7 @@ function showHome(){
 }
 function enterGame(){ $('homeScreen').hidden=true;$('setupScreen').hidden=true;$('gameHud').hidden=false;$('backHome').hidden=false;resize()}
 function loadGame(slot){
- const data=JSON.parse(localStorage.getItem('kov-save-'+slot));currentSlot=slot;state=data.state;N=data.N||state.settings?.mapSize||14;seed=data.seed;state.tech=state.tech||{};state.score=state.score||Array(state.stars.length).fill(0);active=null;selected=null;combat=null;combatBusy=false;panX=0;panY=0;zoom=1;enterGame();message('Welkom terug!');draw();
+ const data=JSON.parse(localStorage.getItem('kov-save-'+slot));currentSlot=slot;state=data.state;N=data.N||state.settings?.mapSize||14;seed=data.seed;state.tech=state.tech||{};state.settings=state.settings||{};if(!Array.isArray(state.settings.aiTribes)){const choices=sprites.tribes.filter(t=>t!==sprites.tribe(state.settings.tribe));state.settings.aiTribes=Array.from({length:state.stars.length-1},(_,i)=>choices[i%choices.length])}for(const u of state.units){const old=u.type;u.type=sprites.normalize(old);if(old!==u.type){const previous={ranger:9,guardian:18,harpooner:11,woodsman:12,healer:9}[old]||10;u.hp=Math.max(1,Math.min(TYPES[u.type].hp,Math.round(u.hp/previous*TYPES[u.type].hp)))}}state.score=state.score||Array(state.stars.length).fill(0);active=null;selected=null;combat=null;combatBusy=false;panX=0;panY=0;zoom=1;enterGame();message('Welkom terug!');draw();
 }
 $('newGame').onclick=()=>{if([0,1].every(i=>localStorage.getItem('kov-save-'+i)))return;$('homeScreen').hidden=true;$('setupScreen').hidden=false};
 $('setupBack').onclick=showHome;
@@ -212,5 +198,5 @@ $('startGame').onclick=()=>{
 $('backHome').onclick=showHome;
 const old=localStorage.getItem('kingdoms-of-vale-01');
 if(old&&!localStorage.getItem('kov-migrated')){if(!localStorage.getItem('kov-save-0')){try{const prior=JSON.parse(old);if(prior?.state?.tiles){prior.state.settings={tribe:'farming',mode:'classic',victory:'conquest',aiCount:1,mapSize:14};prior.state.score=[0,0];localStorage.setItem('kov-save-0',JSON.stringify({seed:prior.seed,state:prior.state,N:14,updated:Date.now()}))}}catch{}}localStorage.setItem('kov-migrated','1')}
-resize();showHome();
+sprites.load();window.addEventListener('kov-sprite-ready',()=>draw());resize();showHome();
 })();
