@@ -5,7 +5,7 @@ const branches=[
 {id:'lumber',icon:'🌲',name:'Lumber',nodes:[{name:'Houtbewerking',cost:4,benefit:'Stadsupgrades 1 ster goedkoper'},{name:'Zagerij',cost:9,benefit:'Nog 1 ster goedkoper'}]},
 {id:'hunting',icon:'🏹',name:'Hunting',nodes:[{name:'Spoorzoeken',cost:4,benefit:'Ontgrendelt boogschutters'},{name:'Meesterschutters',cost:9,benefit:'Boogschutters +1 schade en 1 ster goedkoper'}]},
 {id:'magic',icon:'✨',name:'Magic',nodes:[{name:'Runenleer',cost:4,benefit:'Alle eigen eenheden +1 maximale HP'},{name:'Betovering',cost:9,benefit:'Alle eigen eenheden +1 aanvalsschade'}]},
-{id:'building',icon:'🏛️',name:'Building',nodes:[{name:'Metselen',cost:4,benefit:'Stadsupgrades 1 ster goedkoper'},{name:'Vestingbouw',cost:9,benefit:'+1 ster per stad per beurt'}]},
+{id:'building',icon:'🏛️',name:'Building',nodes:[{name:'Metselen',cost:4,benefit:'Stadsupgrades 1 ster goedkoper'},{name:'Vestingbouw',cost:9,benefit:'Ontgrendelt ridders en +1 ster per stad per beurt'}]},
 {id:'mining',icon:'⛏️',name:'Mining',nodes:[{name:'Mijnbouw',cost:4,benefit:'+1 ster per beurt'},{name:'Edelstenen',cost:9,benefit:'Nog +2 sterren per beurt'}]}
 ];
 const level=(s,id)=>s.tech?.[id]||0;
@@ -40,7 +40,7 @@ function render(state,onUnlock){
    previous=point;
   });
  });
- root.append(board);
+ root.append(board);root.scrollLeft=Math.max(0,(root.scrollWidth-root.clientWidth)/2);root.scrollTop=Math.max(0,(root.scrollHeight-root.clientHeight)/2);
 }
 
 window.GameTech={branches,level,render,
