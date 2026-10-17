@@ -30,7 +30,7 @@ for(let x=3;x<N-3;x++)tiles[idx(x,3)].t='grass';for(let z=3;z<N-3;z++)tiles[idx(
 let cities=starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({x,z,owner,lv:1,name:owner===0?'Hoofdstad':'Rivalenstad '+owner}));
 const names=['Berkwoud','Zonnehaven','Westwacht','Kristalstad','Morgenveld'];
 for(let i=0;i<7;i++){let x=1+Math.floor(rand(i,3,s)*(N-2)),z=1+Math.floor(rand(i,9,s)*(N-2));if(walk(tiles,x,z)&&!cities.some(k=>Math.abs(k.x-x)+Math.abs(k.z-z)<4))cities.push({x,z,owner:-1,lv:1,name:names[i%names.length]})}
-state={tiles,cities,units:starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({id:owner+1,x:owner===0?x+1:x-1,z,owner,hp:10,moved:false,type:'warrior'})),stars:Array(1+(settings.aiCount||1)).fill(7),turn:1,seq:2+(settings.aiCount||1),win:null,tech:{},settings:{...settings},score:Array(1+(settings.aiCount||1)).fill(0)};
+state={tiles,cities,units:starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({id:owner+1,x:owner===0?x+1:x-1,z,owner,hp:10,moved:false,type:'warrior'})),stars:Array(1+(settings.aiCount||1)).fill(7),turn:1,seq:2+(settings.aiCount||1),win:null,tech:settings.tribe?{[settings.tribe]:1}:{},settings:{...settings},score:Array(1+(settings.aiCount||1)).fill(0)};
 selected=null;active=null;panX=0;panY=0;zoom=1;message('Welkom in Kingdoms of Vale!');save();draw()}
 function walk(ts,x,z){return inside(x,z)&&!['water','mountain'].includes(ts[idx(x,z)].t)}
 const tile=(x,z)=>inside(x,z)?state.tiles[idx(x,z)]:null,city=(x,z)=>state.cities.find(v=>v.x===x&&v.z===z),unit=(x,z)=>state.units.find(v=>v.x===x&&v.z===z);
