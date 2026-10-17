@@ -1,12 +1,20 @@
 (()=>{'use strict';
 const N=14,c=document.getElementById('game'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);
 let w=0,h=0,zoom=1,panX=0,panY=0,selected=null,active=null,hit=[],drag=null,seed=0,state,combat=null,combatBusy=false;
-const TYPES={warrior:{name:'Krijger',cost:3,hp:10,damage:5,move:2,range:1},archer:{name:'Boogschutter',cost:5,hp:7,damage:4,move:2,range:3},knight:{name:'Ridder',cost:7,hp:14,damage:6,move:3,range:1}};
+const TYPES={warrior:{name:'Krijger',cost:3,hp:10,damage:5,move:2,range:1},archer:{name:'Boogschutter',cost:5,hp:7,damage:4,move:2,range:3},knight:{name:'Ridder',cost:7,hp:14,damage:6,move:3,range:1},
+ranger:{name:'Ranger',cost:8,hp:9,damage:6,move:3,range:3},
+mage:{name:'Mage',cost:7,hp:8,damage:7,move:2,range:2},
+guardian:{name:'Guardian',cost:6,hp:18,damage:4,move:1,range:1},
+harpooner:{name:'Harpooner',cost:6,hp:11,damage:5,move:2,range:2},
+woodsman:{name:'Woodsman',cost:6,hp:12,damage:7,move:2,range:1},
+healer:{name:'Healer',cost:6,hp:9,damage:2,move:2,range:1},
+golem:{name:'Golem',cost:10,hp:22,damage:8,move:1,range:1}};
 const typeOf=u=>TYPES[u.type]||TYPES.warrior;
 const tech=window.GameTech;
 const damage=u=>tech.damage(state,u,typeOf(u).damage);
 const maxHp=u=>tech.maxHp(state,u,typeOf(u).hp);
 const recruitCost=kind=>tech.unitCost(state,kind,TYPES[kind].cost);
+const ICONS={warrior:'⚔️',archer:'🏹',knight:'🐴',ranger:'🎯',mage:'🔮',guardian:'🛡️',harpooner:'🔱',woodsman:'🪓',healer:'💚',golem:'🪨'};
 const canRecruit=kind=>tech.unlocked(state,kind);
 const cityCost=ct=>tech.cityCost(state,ct);
 const rand=(x,z,s)=>{const n=Math.sin((x+17)*127.1+(z+29)*311.7+s*74.7)*43758.5453;return n-Math.floor(n)};
@@ -70,14 +78,20 @@ function tree(x,y){polygon([[x,y-34],[x-12,y-8],[x+12,y-8]],'#1f6c37');polygon([
 function hill(x,y){polygon([[x-22,y-8],[x,y-40],[x+22,y-8]],'#82918b');polygon([[x,y-40],[x+22,y-8],[x+2,y-8]],'#4b656f');polygon([[x-7,y-28],[x,y-40],[x+9,y-26]],'#e5f5ec')}
 function soldier(x,y,u){const blue=u.owner===0;polygon([[x-7,y-10],[x,y-15],[x+7,y-10],[x+7,y-1],[x,y+4],[x-7,y-1]],blue?'#2b93d8':'#cb5c68');ctx.fillStyle='#f8dbab';ctx.beginPath();ctx.arc(x,y-19,6,0,7);ctx.fill();ctx.fillStyle=blue?'#224b7e':'#742f46';ctx.fillRect(x-7,y-27,14,5);ctx.fillStyle='#1d2431';
 if(u.type==='archer'){ctx.strokeStyle='#ffe09a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+10,y-12,8,-1.3,1.3);ctx.stroke();ctx.fillRect(x+8,y-21,2,19)}
+else if(u.type==='mage'){ctx.fillStyle='#b889e9';ctx.fillRect(x+8,y-26,4,35);ctx.fillStyle='#eed3ff';ctx.beginPath();ctx.arc(x+10,y-29,5,0,7);ctx.fill()}
+else if(u.type==='ranger'||u.type==='harpooner'){ctx.strokeStyle='#f4eaa1';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+10,y-12,10,-1.4,1.4);ctx.stroke();ctx.fillRect(x+8,y-23,2,24)}
+else if(u.type==='healer'){ctx.fillStyle='#7fffb1';ctx.fillRect(x+8,y-24,4,31);ctx.fillRect(x+4,y-18,12,4)}
+else if(u.type==='woodsman'){ctx.fillStyle='#d8e3ed';ctx.fillRect(x+8,y-27,13,9);ctx.fillStyle='#72523d';ctx.fillRect(x+10,y-20,3,26)}
+else if(u.type==='golem'){ctx.fillStyle='#8a9dab';ctx.fillRect(x-12,y-26,24,24);ctx.fillStyle='#a5c8cb';ctx.fillRect(x-5,y-20,4,4);ctx.fillRect(x+5,y-20,4,4)}
+else if(u.type==='guardian'){ctx.fillStyle='#d5e4f1';ctx.fillRect(x-12,y-15,20,22);ctx.fillStyle='#efcc82';ctx.fillRect(x+10,y-20,3,27)}
 else if(u.type==='knight'){ctx.fillStyle='#c8cbd5';ctx.fillRect(x-8,y-13,17,17);ctx.fillStyle='#f5d06c';ctx.fillRect(x+8,y-17,3,26)}
 else{ctx.fillRect(x+8,y-13,2,23);ctx.fillStyle='#faeea9';ctx.fillRect(x+7,y-15,4,7)}ctx.fillStyle='#26333c';ctx.fillRect(x-6,y+4,4,4);ctx.fillRect(x+3,y+4,4,4);ctx.fillStyle='#0009';ctx.fillRect(x-12,y+12,24,4);ctx.fillStyle=blue?'#65d4ff':'#ff9a99';ctx.fillRect(x-12,y+12,Math.max(0,u.hp/maxHp(u))*24,4)}
 function coord(x,z){const unit=42*zoom;return [w/2+panX+(x-z)*unit,h*.30+panY+(x+z)*unit*.52]}
-function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();const targets=active&&!active.moved?new Set(attackTargets(active).map(v=>idx(v.x,v.z))):new Set();
+function draw(){if(!ctx)return;ctx.clearRect(0,0,w,h);const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#304961');bg.addColorStop(1,'#90bbaf');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);hit=[];const moves=active&&!active.moved?reachable(active):new Set();const targets=active&&!active.moved?new Set(attackTargets(active).map(v=>idx(v.x,v.z))):new Set();const heals=active&&!active.moved&&active.type==='healer'?new Set(state.units.filter(v=>v.owner===0&&v!==active&&dist(active,v)===1&&v.hp<maxHp(v)).map(v=>idx(v.x,v.z))):new Set();
 for(let layer=0;layer<N*2;layer++)for(let z=0;z<N;z++){let x=layer-z;if(!inside(x,z))continue;const t=tile(x,z),[px,py]=coord(x,z),a=42*zoom,b=a*.52,highlight=selected&&selected.x===x&&selected.z===z;
 let colors={water:'#4da9bf',grass:'#83c868',forest:'#61ad5b',mountain:'#a1a69a',sand:'#eac879'},side={water:'#267b94',grass:'#528f4c',forest:'#438446',mountain:'#666f70',sand:'#cb9e53'};
 const p=[[px,py],[px+a,py+b],[px,py+2*b],[px-a,py+b]];hit.push({x,z,points:p,depth:layer});
-polygon([[px-a,py+b],[px,py+2*b],[px,py+2*b+8*zoom],[px-a,py+b+8*zoom]],side[t.t]);polygon([[px,py+2*b],[px+a,py+b],[px+a,py+b+8*zoom],[px,py+2*b+8*zoom]],side[t.t]);polygon(p,highlight?'#f7e5a0':targets.has(idx(x,z))?'#f08a82':moves.has(idx(x,z))?'#7cead4':colors[t.t],'#19393025');
+polygon([[px-a,py+b],[px,py+2*b],[px,py+2*b+8*zoom],[px-a,py+b+8*zoom]],side[t.t]);polygon([[px,py+2*b],[px+a,py+b],[px+a,py+b+8*zoom],[px,py+2*b+8*zoom]],side[t.t]);polygon(p,highlight?'#f7e5a0':targets.has(idx(x,z))?'#f08a82':heals.has(idx(x,z))?'#a6ecad':moves.has(idx(x,z))?'#7cead4':colors[t.t],'#19393025');
 const cy=py+b;ctx.save();ctx.translate(px,cy);ctx.scale(1.45*zoom,1.45*zoom);
 if(t.t==='forest')tree(0,0);if(t.t==='mountain')hill(0,5);
 if(t.t==='sand'&&t.r){ctx.fillStyle='#91a847';ctx.fillRect(0,-10,3,12)}
@@ -88,7 +102,7 @@ if(ct||u){ctx.save();ctx.translate(px,cy);ctx.scale(1.45*zoom,1.45*zoom);
 if(ct)tower(0,-7,ct.owner,ct.lv);
 if(u)soldier(9,3,u);
 ctx.restore()}
-if(moves.has(idx(x,z))||targets.has(idx(x,z))){ctx.strokeStyle=targets.has(idx(x,z))?'#ff4444':'#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
+if(moves.has(idx(x,z))||targets.has(idx(x,z))||heals.has(idx(x,z))){ctx.strokeStyle=targets.has(idx(x,z))?'#ff4444':heals.has(idx(x,z))?'#36ef75':'#fff7bf';ctx.lineWidth=2;ctx.beginPath();p.forEach(([vx,vy],i)=>i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy));ctx.closePath();ctx.stroke()}
 if(combat&&((combat.from.x===x&&combat.from.z===z)||(combat.to.x===x&&combat.to.z===z))){
  const progress=Math.min(1,(performance.now()-combat.started)/380),pulse=Math.sin(progress*Math.PI);
  ctx.strokeStyle='#ffe574';ctx.lineWidth=4*pulse;ctx.beginPath();ctx.arc(px,cy-16,8+18*pulse,0,Math.PI*2);ctx.stroke();
@@ -98,13 +112,16 @@ $('stars').textContent=state.stars[0];$('turn').textContent=state.turn;$('cities
 $('selection').textContent=ct?ct.name+' · niveau '+ct.lv:u?(u.owner===0?'Jouw ':'Vijandelijke ')+typeOf(u).name:'Selecteer een tegel';
 $('details').textContent=u?'❤️ '+u.hp+'/'+maxHp(u)+' · ⚔️ '+damage(u)+' · 👟 '+typeOf(u).move+' · 🏹 '+typeOf(u).range+' · '+(u.moved?'Al verplaatst':'Klaar voor actie'):ct?ct.owner===0?'Jouw stad · +'+(ct.lv+2)+' sterren per beurt':ct.owner===1?'Vijandelijke stad':'Neutraal dorp':t?'Terrein: '+t.t:'Tik op een tegel om te starten';
 $('recruit').disabled=!ct||ct.owner!==0||!canRecruit($('unitType').value)||state.stars[0]<recruitCost($('unitType').value)||state.win!==null;
-for(const opt of $('unitType').options){const open=canRecruit(opt.value);opt.disabled=!open;opt.textContent=(open?'':'🔒 ')+({warrior:'⚔️ Krijger',archer:'🏹 Boogschutter',knight:'🐴 Ridder'}[opt.value])+' · '+recruitCost(opt.value)+'⭐';}$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<cityCost(ct)||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?cityCost(ct):6)+'⭐)';
+for(const opt of $('unitType').options){const open=canRecruit(opt.value);opt.disabled=!open;opt.textContent=(open?'':'🔒 ')+ICONS[opt.value]+' '+TYPES[opt.value].name+' · '+recruitCost(opt.value)+'⭐';}$('upgrade').disabled=!ct||ct.owner!==0||ct.lv>=4||state.stars[0]<cityCost(ct)||state.win!==null;$('upgrade').textContent='🏛️ Upgrade ('+(ct?cityCost(ct):6)+'⭐)';
 }
 function pointIn(p,poly){let yes=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])yes=!yes}return yes}
 function pick(px,py){for(const u of [...state.units].reverse()){const [ux,uy]=coord(u.x,u.z),sc=1.45*zoom,by=uy+21*zoom;if(Math.abs(px-(ux+9*sc))<15*sc&&py>=by-31*sc&&py<=by+17*sc)return {x:u.x,z:u.z}}for(let i=hit.length-1;i>=0;i--)if(pointIn([px,py],hit[i].points))return hit[i];return null}
 function tap(x,z){
  if(state.win!==null||combatBusy)return;
  const u=unit(x,z);
+ if(active&&!active.moved&&active.type==='healer'&&u&&u.owner===0&&u!==active&&dist(active,u)===1&&u.hp<maxHp(u)){
+  u.hp=Math.min(maxHp(u),u.hp+5);active.moved=true;message('💚 Healer herstelt 5 HP');active=null;selected={x,z};save();draw();return;
+ }
  if(active&&!active.moved){
   const opponent=u&&u.owner===1&&dist(active,{x,z})<=typeOf(active).range?u:null;
   if(opponent){resolveCombat(active,opponent);return;}
