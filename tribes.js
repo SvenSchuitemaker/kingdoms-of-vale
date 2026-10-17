@@ -10,7 +10,7 @@ const tribes=[
 ];
 const $=id=>document.getElementById(id);let chosen='farming',pending='farming';
 const data=id=>tribes.find(t=>t.id===id)||tribes[0];
-function portrait(t){const el=document.createElement('span');el.className='tribeAvatar';el.dataset.tribe=t.id;el.setAttribute('role','img');el.setAttribute('aria-label',t.name);return el}
+function portrait(t){const el=document.createElement('span');el.className='tribeAvatar';el.dataset.tribe=t.id;el.setAttribute('role','img');el.setAttribute('aria-label',t.name);const img=document.createElement('img');img.src='./assets/tribes/'+t.id+'.webp';img.alt='';img.loading='lazy';img.decoding='async';img.onerror=()=>{img.remove();el.textContent=t.icon};el.append(img);return el}
 function updatePreview(){const t=data(pending);$('tribePreviewName').textContent=t.name+' · '+t.path;$('tribePreviewDescription').textContent=t.description;$('tribePreviewBonus').textContent=t.bonus;[...$('tribeGrid').children].forEach(e=>{const current=e.dataset.tribe===pending;e.classList.toggle('selected',current);e.setAttribute('aria-pressed',String(current))})}
 function show(){pending=chosen;$('tribeModal').hidden=false;updatePreview();$('closeTribes').focus()}
 function hide(){$('tribeModal').hidden=true;$('chooseTribe').focus()}
