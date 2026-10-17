@@ -26,7 +26,7 @@ let cities=starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({x,z,owne
 const names=['Berkwoud','Zonnehaven','Westwacht','Kristalstad','Morgenveld'];
 for(let i=0;i<7;i++){let x=1+Math.floor(rand(i,3,s)*(N-2)),z=1+Math.floor(rand(i,9,s)*(N-2));if(walk(tiles,x,z)&&!cities.some(k=>Math.abs(k.x-x)+Math.abs(k.z-z)<4))cities.push({x,z,owner:-1,lv:1,name:names[i%names.length]})}
 state={tiles,cities,units:starts.slice(0,1+(settings.aiCount||1)).map(([x,z],owner)=>({id:owner+1,x:owner===0?x+1:x-1,z,owner,hp:10,moved:false,type:'warrior'})),stars:Array(1+(settings.aiCount||1)).fill(7),turn:1,seq:2+(settings.aiCount||1),win:null,tech:settings.tribe?{[settings.tribe]:1}:{},settings:{...settings,aiTribes:Array.from({length:settings.aiCount||1},(_,i)=>{const options=sprites.tribes.filter(t=>t!==sprites.tribe(settings.tribe));return options[i%options.length]})},score:Array(1+(settings.aiCount||1)).fill(0)};
-selected=null;active=null;panX=0;panY=0;zoom=1;message('Welkom in Kingdoms of Vale!');save();draw()}
+sprites.load([sprites.tribe(state.settings.tribe),...state.settings.aiTribes]);selected=null;active=null;panX=0;panY=0;zoom=1;message('Welkom in Kingdoms of Vale!');save();draw()}
 function walk(ts,x,z){return inside(x,z)&&!['water','mountain'].includes(ts[idx(x,z)].t)}
 const tile=(x,z)=>inside(x,z)?state.tiles[idx(x,z)]:null,city=(x,z)=>state.cities.find(v=>v.x===x&&v.z===z),unit=(x,z)=>state.units.find(v=>v.x===x&&v.z===z);
 // Breadth-first search: only reachable tiles are shown. Units cannot cross blockers.
@@ -184,7 +184,7 @@ function showHome(){
 }
 function enterGame(){ $('homeScreen').hidden=true;$('setupScreen').hidden=true;$('gameHud').hidden=false;$('backHome').hidden=false;resize()}
 function loadGame(slot){
- const data=JSON.parse(localStorage.getItem('kov-save-'+slot));currentSlot=slot;state=data.state;N=data.N||state.settings?.mapSize||14;seed=data.seed;state.tech=state.tech||{};state.settings=state.settings||{};if(!Array.isArray(state.settings.aiTribes)){const choices=sprites.tribes.filter(t=>t!==sprites.tribe(state.settings.tribe));state.settings.aiTribes=Array.from({length:state.stars.length-1},(_,i)=>choices[i%choices.length])}for(const u of state.units){const old=u.type;u.type=sprites.normalize(old);if(old!==u.type){const previous={ranger:9,guardian:18,harpooner:11,woodsman:12,healer:9}[old]||10;u.hp=Math.max(1,Math.min(TYPES[u.type].hp,Math.round(u.hp/previous*TYPES[u.type].hp)))}}state.score=state.score||Array(state.stars.length).fill(0);active=null;selected=null;combat=null;combatBusy=false;panX=0;panY=0;zoom=1;enterGame();message('Welkom terug!');draw();
+ const data=JSON.parse(localStorage.getItem('kov-save-'+slot));currentSlot=slot;state=data.state;N=data.N||state.settings?.mapSize||14;seed=data.seed;state.tech=state.tech||{};state.settings=state.settings||{};if(!Array.isArray(state.settings.aiTribes)){const choices=sprites.tribes.filter(t=>t!==sprites.tribe(state.settings.tribe));state.settings.aiTribes=Array.from({length:state.stars.length-1},(_,i)=>choices[i%choices.length])}for(const u of state.units){const old=u.type;u.type=sprites.normalize(old);if(old!==u.type){const previous={ranger:9,guardian:18,harpooner:11,woodsman:12,healer:9}[old]||10;u.hp=Math.max(1,Math.min(TYPES[u.type].hp,Math.round(u.hp/previous*TYPES[u.type].hp)))}}state.score=state.score||Array(state.stars.length).fill(0);sprites.load([sprites.tribe(state.settings.tribe),...state.settings.aiTribes]);active=null;selected=null;combat=null;combatBusy=false;panX=0;panY=0;zoom=1;enterGame();message('Welkom terug!');draw();
 }
 $('newGame').onclick=()=>{if([0,1].every(i=>localStorage.getItem('kov-save-'+i)))return;$('homeScreen').hidden=true;$('setupScreen').hidden=false};
 $('setupBack').onclick=showHome;
@@ -198,5 +198,5 @@ $('startGame').onclick=()=>{
 $('backHome').onclick=showHome;
 const old=localStorage.getItem('kingdoms-of-vale-01');
 if(old&&!localStorage.getItem('kov-migrated')){if(!localStorage.getItem('kov-save-0')){try{const prior=JSON.parse(old);if(prior?.state?.tiles){prior.state.settings={tribe:'farming',mode:'classic',victory:'conquest',aiCount:1,mapSize:14};prior.state.score=[0,0];localStorage.setItem('kov-save-0',JSON.stringify({seed:prior.seed,state:prior.state,N:14,updated:Date.now()}))}}catch{}}localStorage.setItem('kov-migrated','1')}
-sprites.load();window.addEventListener('kov-sprite-ready',()=>draw());resize();showHome();
+window.addEventListener('kov-sprite-ready',()=>draw());resize();showHome();
 })();
